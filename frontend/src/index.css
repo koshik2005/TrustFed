@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@import "shadcn/tailwind.css";
+
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+  /* ── Clean White Professional Palette ── */
+  --color-bg-base:       #F8FAFC;   /* Slate 50 */
+  --color-bg-surface:    #FFFFFF;   /* Pure White */
+  --color-bg-elevated:   #FFFFFF;   /* Pure White */
+  --color-border:        rgba(0,0,0,0.1);
+
+  --color-accent-blue:   #0F52BA;   /* Sapphire Blue */
+  --color-accent-cyan:   #0284C7;   /* Ocean Blue */
+  --color-accent-violet: #6366F1;
+  --color-success:       #059669;
+  --color-warning:       #D97706;
+  --color-danger:        #DC2626;
+
+  --color-text-primary:   #0F172A;       /* Slate 900 */
+  --color-text-secondary: #334155;       /* Slate 700 */
+  --color-text-muted:     #64748B;       /* Slate 500 */
+  --color-navy-bright:    #1E3A8A;       /* Navy highlight */
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Effects */
+  --glass-bg:     rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 82, 186, 0.15);
+  --glass-blur:   blur(20px);
+  --shadow-glow-blue: 0 4px 20px rgba(15,82,186,0.15);
+  --shadow-glow-cyan: 0 4px 20px rgba(2,132,199,0.15);
+
+  /* Shadcn tokens — mapped to light professional theme */
+  --background:             oklch(1 0 0);
+  --foreground:             oklch(0.14 0.05 245);
+  --card:                   oklch(1 0 0);
+  --card-foreground:        oklch(0.14 0.05 245);
+  --popover:                oklch(1 0 0);
+  --popover-foreground:     oklch(0.14 0.05 245);
+  --primary:                oklch(0.45 0.15 250);
+  --primary-foreground:     oklch(0.98 0 0);
+  --secondary:              oklch(0.96 0 0);
+  --secondary-foreground:   oklch(0.20 0 0);
+  --muted:                  oklch(0.96 0 0);
+  --muted-foreground:       oklch(0.45 0 0);
+  --accent:                 oklch(0.96 0 0);
+  --accent-foreground:      oklch(0.20 0 0);
+  --destructive:            oklch(0.60 0.2 15);
+  --border:                 oklch(0.90 0 0);
+  --input:                  oklch(0.90 0 0);
+  --ring:                   oklch(0.45 0.15 250);
+  --chart-1:                oklch(0.55 0.2 250);
+  --chart-2:                oklch(0.65 0.15 195);
+  --chart-3:                oklch(0.55 0.18 285);
+  --chart-4:                oklch(0.70 0.17 45);
+  --chart-5:                oklch(0.45 0.18 15);
+  --sidebar:                oklch(1 0 0);
+  --sidebar-foreground:     oklch(0.14 0.05 245);
+  --sidebar-primary:        oklch(0.45 0.15 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent:         oklch(0.96 0 0);
+  --sidebar-accent-foreground: oklch(0.14 0.05 245);
+  --sidebar-border:         oklch(0.90 0 0);
+  --sidebar-ring:           oklch(0.45 0.15 250);
+  --color-background:       oklch(1 0 0);
+  --color-foreground:       oklch(0.14 0.05 245);
+  --color-ring:             oklch(0.45 0.15 250);
+}
+
+/* ── Global Base Styles ─────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    font-family: var(--font-sans);
+  }
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(29,107,243,0.3); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(29,107,243,0.5); }
+}
+
+/* ── Glassmorphism Component ────────────────────────────────────────────── */
+.glass-card {
+  background:  var(--glass-bg);
+  border:      1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-card:hover {
+  border-color: rgba(29,107,243,0.30);
+  box-shadow: var(--shadow-glow-blue);
+}
+
+/* ── Sidebar Styles ─────────────────────────────────────────────────────── */
+.sidebar-nav {
+  width: 240px;
+  min-width: 240px;
+  background: #FFFFFF;
+  border-right: 1px solid rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  gap: 0.25rem;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  position: relative;
+}
+.sidebar-item:hover {
+  background: rgba(15,82,186,0.05);
+  color: #0F172A;
+}
+.sidebar-item.active {
+  background: rgba(15,82,186,0.1);
+  color: #0F52BA;
+  font-weight: 600;
+}
+.sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: linear-gradient(180deg, #0F52BA, #0284C7);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Stat Dot / Status Indicator ────────────────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-dot.live {
+  background: var(--color-success);
+  box-shadow: 0 0 0 0 rgba(0,200,150,0.4);
+  animation: pulseDot 2s infinite;
+}
+@keyframes pulseDot {
+  0%  { box-shadow: 0 0 0 0 rgba(0,200,150,0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(0,200,150,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(0,200,150,0); }
+}
+
+/* ── Page Content Area ──────────────────────────────────────────────────── */
+.page-content {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  overflow-y: auto;
+  background: var(--color-bg-base);
+  min-height: 100vh;
+}
+
+/* ── Typography Utilities ───────────────────────────────────────────────── */
+.text-gradient-blue {
+  background: linear-gradient(135deg, #1D6BF3, #00CFDD);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-gradient-hero {
+  background: linear-gradient(135deg, #FFFFFF 0%, #B8C7E0 50%, #1D6BF3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Ambient Background Glows ───────────────────────────────────────────── */
+.ambient-glow {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(120px);
+}
+.ambient-glow-blue {
+  background: rgba(29,107,243,0.08);
+}
+.ambient-glow-cyan {
+  background: rgba(0,207,221,0.06);
+}
+
+/* ── Metric Badge ───────────────────────────────────────────────────────── */
+.metric-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.metric-badge.success {
+  background: rgba(0,200,150,0.12);
+  border: 1px solid rgba(0,200,150,0.3);
+  color: #00C896;
+}
+.metric-badge.warning {
+  background: rgba(246,166,35,0.12);
+  border: 1px solid rgba(246,166,35,0.3);
+  color: #F6A623;
+}
+.metric-badge.danger {
+  background: rgba(240,65,90,0.12);
+  border: 1px solid rgba(240,65,90,0.3);
+  color: #F0415A;
+}
+
+/* ── Animated Border Glow (for LLM card) ───────────────────────────────── */
+.animated-border { position: relative; z-index: 1; }
+.animated-border::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  background: linear-gradient(45deg, #1D6BF3, #00CFDD, #7C5DFF, #1D6BF3);
+  background-size: 400%;
+  z-index: -1;
+  filter: blur(8px);
+  animation: glowing 8s linear infinite;
+  border-radius: 14px;
+  opacity: 0.8;
+}
+@keyframes glowing {
+  0%   { background-position: 0 0; }
+  50%  { background-position: 400% 0; }
+  100% { background-position: 0 0; }
+}

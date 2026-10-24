@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trustfed-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:80,http://localhost,http://127.0.0.1
+      - JWT_SECRET=${JWT_SECRET:-trustfed-super-secure-production-secret-change-me}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-password123}
+      - RESULTS_DIR=/app/results
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-meta/llama-3.1-70b-instruct}
+    volumes:
+      - backend_artifacts:/app/artifacts
+      - backend_data:/app/data
+      - ./results:/app/results:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+    container_name: trustfed-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend_artifacts:
+  backend_data:

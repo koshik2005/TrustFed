@@ -1,0 +1,47 @@
+# Environment & Secrets
+.env
+*.env
+!.env.example
+backend/.env
+frontend/.env
+*.local
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+backend/trustfed.db
+
+# Machine Learning Artifacts & Data Caches
+backend/artifacts/*.npz
+backend/data/*.data
+*.npz
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+.pytest_cache/
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+dist-ssr/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

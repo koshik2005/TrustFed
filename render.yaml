@@ -1,0 +1,39 @@
+services:
+  # FastAPI Backend Service
+  - type: web
+    name: trustfed-backend
+    env: python
+    region: oregon
+    plan: standard # 1-2GB RAM recommended for exact SHAP and Federated Learning simulations
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEMO_PASSWORD
+        value: password123
+      - key: CORS_ORIGINS
+        value: https://trustfed-frontend.onrender.com,http://localhost:5173
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_MODEL
+        value: meta/llama-3.1-70b-instruct
+
+  # React Frontend Static Site
+  - type: static
+    name: trustfed-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://trustfed-backend.onrender.com/api
