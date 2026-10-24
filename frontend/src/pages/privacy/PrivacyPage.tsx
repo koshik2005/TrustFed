@@ -34,7 +34,13 @@ export default function PrivacyPage() {
     ? ((withoutDPPct - withDPPct) / withoutDPPct * 100).toFixed(1)
     : null;
 
-  const terminalLines = [
+  interface TerminalLine {
+    text: string;
+    color: string;
+    highlight?: string;
+  }
+
+  const terminalLines: TerminalLine[] = [
     { text: "$ Membership-inference attack (loss-threshold, Yeom et al.)", color: "text-emerald-400" },
     { text: "> Members: pooled training records | Non-members: held-out test records", color: "text-emerald-400" },
     { text: `> Reference model (identical run, no DP): attack AUC = ${withoutDPPct !== null ? (withoutDPPct / 100).toFixed(3) : '…'}`, color: "text-amber-400" },
