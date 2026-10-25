@@ -115,7 +115,7 @@ export default function PrivacyPage() {
         {/* Left Card (Without DP) */}
         <Card className="glass-card bg-white border-red-500/30 flex flex-col items-center text-center relative overflow-hidden">
           <div className="absolute top-6 left-6">
-            <Badge className="bg-red-500/20 text-red-300 border-none hover:bg-red-500/30">
+            <Badge className="bg-red-50 text-red-700 border border-red-200 font-semibold">
               No Protection
             </Badge>
           </div>
@@ -156,7 +156,7 @@ export default function PrivacyPage() {
         {/* Right Card (With DP) */}
         <Card className="glass-card bg-white border-emerald-500/30 flex flex-col items-center text-center relative overflow-hidden">
           <div className="absolute top-6 left-6">
-            <Badge className="bg-emerald-500/20 text-emerald-600 border-none hover:bg-emerald-500/30 font-semibold">
+            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
               DP Active
             </Badge>
           </div>

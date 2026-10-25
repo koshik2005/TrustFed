@@ -30,8 +30,8 @@ export default function GlobalMonitor() {
 
   useEffect(() => {
     fetchStatus();
-    // Poll every 10 seconds for real-time updates
-    const interval = setInterval(fetchStatus, 10000);
+    // Poll every 3 seconds for responsive training telemetry
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 

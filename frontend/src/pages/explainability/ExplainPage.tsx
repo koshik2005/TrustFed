@@ -72,8 +72,8 @@ export default function ExplainPage() {
           <h1 className="text-[24px] font-bold text-slate-900 mb-1 tracking-tight">AI Explainability</h1>
           <p className="text-slate-600 text-[13px] font-medium">Patient #{prediction?.patientId || 'Unknown'} · Global Model · Latest Prediction</p>
         </div>
-        <div className={`border px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-2 ${isHighRisk ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-green-500/10 border-green-500/30 text-green-400'}`}>
-          <span className={`w-2 h-2 rounded-full animate-pulse ${isHighRisk ? 'bg-red-400' : 'bg-green-400'}`}></span>
+        <div className={`border px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-2 ${isHighRisk ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+          <span className={`w-2 h-2 rounded-full animate-pulse ${isHighRisk ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
           Predicted Risk: {riskScorePercentage}% {prediction?.riskLabel?.toUpperCase()}
         </div>
       </div>
