@@ -194,18 +194,18 @@ export default function SettingsPage() {
         <motion.div 
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="fixed bottom-0 left-0 w-full glass-card border-t border-slate-200 border-x-0 border-b-0 py-4 z-40 bg-[#070b14]/90 backdrop-blur-xl"
+          className="fixed bottom-0 left-0 w-full border-t border-slate-200 py-4 z-40 bg-white/95 backdrop-blur-xl shadow-2xl"
         >
           {/* Use the same max-w container but pad the left to align with the main content area (nav offset) */}
           <div className="max-w-[1440px] mx-auto w-full px-4 md:px-12 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2 text-amber-400 font-medium text-sm md:ml-[260px]">
-              <AlertTriangle className="w-4 h-4" /> Unsaved Changes
+            <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm md:ml-[260px]">
+              <AlertTriangle className="w-4 h-4 text-amber-500" /> Unsaved Changes
             </div>
             <div className="flex gap-4">
-              <Button variant="outline" className="border-slate-600 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all">
+              <Button variant="outline" className="border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all">
                 Reset to Defaults
               </Button>
-              <Button onClick={saveSettings} className="bg-gradient-to-r from-blue-500 to-cyan-400 text-slate-900 font-semibold shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] hover:brightness-110 transition-all border-none">
+              <Button onClick={saveSettings} className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold shadow-md hover:brightness-105 transition-all border-none">
                 Deploy Configuration
               </Button>
             </div>

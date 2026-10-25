@@ -67,7 +67,7 @@ export default function PrivacyPage() {
           <h1 className="text-slate-900 font-bold text-[24px] mb-1 tracking-tight">Privacy Validation Report</h1>
           <p className="text-slate-600 text-[13px] font-mono">Membership-Inference Attack Simulation · Differential Privacy Proof</p>
         </div>
-        <Badge className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 px-3 py-1 rounded-full text-[13px] font-semibold flex items-center gap-2">
+        <Badge className="bg-emerald-50 border border-emerald-500/40 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-full text-[13px] font-semibold flex items-center gap-2">
           <ShieldCheck className="w-4 h-4" /> DP Enabled — Protected
         </Badge>
       </div>
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
             <div className="relative w-[200px] h-[100px] mb-6 drop-shadow-[0_0_12px_rgba(239,68,68,0.5)]">
               <svg className="w-full h-full" viewBox="0 0 200 100">
                 {/* Background Arc */}
-                <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="rgba(255,255,255,0.05)" strokeLinecap="round" strokeWidth="12" />
+                <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#E2E8F0" strokeLinecap="round" strokeWidth="12" />
                 {/* Foreground Arc */}
                 <motion.path 
                   initial={{ strokeDashoffset: arcLength }}
@@ -156,7 +156,7 @@ export default function PrivacyPage() {
         {/* Right Card (With DP) */}
         <Card className="glass-card bg-white border-emerald-500/30 flex flex-col items-center text-center relative overflow-hidden">
           <div className="absolute top-6 left-6">
-            <Badge className="bg-emerald-500/20 text-emerald-300 border-none hover:bg-emerald-500/30">
+            <Badge className="bg-emerald-500/20 text-emerald-600 border-none hover:bg-emerald-500/30 font-semibold">
               DP Active
             </Badge>
           </div>
@@ -167,7 +167,7 @@ export default function PrivacyPage() {
             <div className="relative w-[200px] h-[100px] mb-6 drop-shadow-[0_0_12px_rgba(16,185,129,0.4)]">
               <svg className="w-full h-full" viewBox="0 0 200 100">
                 {/* Background Arc */}
-                <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="rgba(255,255,255,0.05)" strokeLinecap="round" strokeWidth="12" />
+                <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#E2E8F0" strokeLinecap="round" strokeWidth="12" />
                 {/* Foreground Arc */}
                 <motion.path 
                   initial={{ strokeDashoffset: arcLength }}
@@ -197,14 +197,14 @@ export default function PrivacyPage() {
       </div>
 
       {/* TERMINAL CARD */}
-      <Card className="glass-card bg-[#040810]/90 border-emerald-500/20 shadow-lg relative z-10 backdrop-blur-xl">
+      <Card className="glass-card bg-[#040810]/95 border-emerald-500/30 shadow-2xl relative z-10 backdrop-blur-xl">
         <CardContent className="p-6">
-          <div className="flex justify-between items-center border-b border-slate-200 pb-4 mb-4">
-            <div className="flex items-center gap-2 text-slate-900 font-bold text-[14px]">
-              <TerminalSquare className="w-5 h-5 text-emerald-500" />
+          <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+            <div className="flex items-center gap-2 text-slate-100 font-bold text-[14px]">
+              <TerminalSquare className="w-5 h-5 text-emerald-400" />
               <span>Attack Simulation Log</span>
             </div>
-            <Badge className="bg-transparent border border-emerald-500/40 text-emerald-500 font-mono text-[10px] tracking-widest uppercase rounded">
+            <Badge className="bg-transparent border border-emerald-500/40 text-emerald-400 font-mono text-[10px] tracking-widest uppercase rounded">
               Completed
             </Badge>
           </div>

@@ -25,8 +25,8 @@ const ROLES: { id: UserRole; title: string; desc: string }[] = [
 
 export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>('hospital_staff');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('hospital@trustfed.ai');
+  const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = useAuthStore();
@@ -66,7 +66,7 @@ export default function LoginPage() {
           
           {/* Header Row */}
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-cyan-500 text-base font-bold text-slate-900 shadow-lg">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-cyan-500 text-base font-bold text-white shadow-md">
               TF
             </div>
             <div className="flex flex-col">
@@ -86,7 +86,11 @@ export default function LoginPage() {
                 return (
                   <div
                     key={role.id}
-                    onClick={() => { setSelectedRole(role.id); setEmail(DEMO_EMAIL[role.id]); }}
+                    onClick={() => {
+                      setSelectedRole(role.id);
+                      setEmail(DEMO_EMAIL[role.id]);
+                      setPassword('password123');
+                    }}
                     className={cn(
                       "cursor-pointer rounded-lg border p-3 text-center transition-all duration-200 relative overflow-hidden",
                       isActive
@@ -143,7 +147,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="mt-2 h-[48px] w-full rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-sm font-semibold text-slate-900 shadow-[0_0_24px_rgba(59,130,246,0.35)] transition-all duration-200 hover:opacity-90 hover:shadow-[0_0_32px_rgba(59,130,246,0.5)] active:scale-[0.98] disabled:opacity-70"
+              className="mt-2 h-[48px] w-full rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-sm font-bold text-white shadow-md transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-[0.98] disabled:opacity-70"
             >
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

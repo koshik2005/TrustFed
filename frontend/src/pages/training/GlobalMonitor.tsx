@@ -128,12 +128,12 @@ export default function GlobalMonitor() {
 
         {/* Card 3: AGPM Epsilon */}
         <Card className="glass-card border-slate-200 p-6 flex flex-col justify-center hover:border-blue-500/30 transition-colors">
-          <div className="text-cyan-400 font-bold text-[28px] font-mono mb-1 leading-none">
+          <div className="text-cyan-700 font-bold text-[28px] font-mono mb-1 leading-none">
             {session?.privacyBudget != null ? `ε = ${session.privacyBudget.toFixed(2)}` : 'ε = ∞ (no DP)'}
           </div>
           <div className="text-slate-600 text-[12px] font-medium mb-3">Privacy budget (RDP accountant, worst hospital)</div>
           <div>
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-none font-semibold text-[11px]">
+            <Badge className="bg-emerald-50 text-emerald-700 border-none font-semibold text-[11px]">
               δ = 1e-5 · record-level DP-SGD
             </Badge>
           </div>
@@ -144,33 +144,33 @@ export default function GlobalMonitor() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Network Diagram */}
-        <Card className="glass-card col-span-1 lg:col-span-2 bg-[#050A14] border-slate-200 overflow-hidden relative h-[360px] flex flex-col">
-          <div className="p-4 border-b border-slate-200 relative z-30">
-            <h2 className="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-900">FL Hierarchy — Live Network</h2>
+        <Card className="glass-card col-span-1 lg:col-span-2 bg-slate-900 border-slate-800 text-slate-100 overflow-hidden relative h-[360px] flex flex-col shadow-xl">
+          <div className="p-4 border-b border-slate-800 relative z-30">
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-200">FL Hierarchy — Live Network</h2>
           </div>
           
           <div className="flex-1 relative flex flex-col items-center justify-between py-8 px-12 z-20">
             {/* Global Server */}
             <div className="relative flex flex-col items-center z-20">
-              <div className="w-14 h-14 rounded-full border-2 border-blue-500 bg-[#050A14] flex items-center justify-center shadow-[0_0_24px_rgba(59,130,246,0.5)] z-20">
-                <Cloud className="text-blue-500 h-7 w-7" />
+              <div className="w-14 h-14 rounded-full border-2 border-blue-500 bg-slate-950 flex items-center justify-center shadow-[0_0_24px_rgba(59,130,246,0.5)] z-20">
+                <Cloud className="text-blue-400 h-7 w-7" />
               </div>
-              <span className="text-slate-900 text-[13px] mt-3 font-medium">Global Server</span>
+              <span className="text-slate-100 text-[13px] mt-3 font-semibold">Global Server</span>
             </div>
 
             {/* Hubs */}
             <div className="flex justify-between w-full max-w-[480px] mt-6 relative z-20">
               <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-full border-2 border-cyan-500 bg-[#050A14] flex items-center justify-center z-20 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
-                  <Network className="text-cyan-500 h-5 w-5" />
+                <div className="w-11 h-11 rounded-full border-2 border-cyan-500 bg-slate-950 flex items-center justify-center z-20 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+                  <Network className="text-cyan-400 h-5 w-5" />
                 </div>
-                <span className="text-slate-600 text-[12px] mt-2 font-medium">Hub East</span>
+                <span className="text-slate-300 text-[12px] mt-2 font-medium">Hub East</span>
               </div>
               <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-full border-2 border-cyan-500 bg-[#050A14] flex items-center justify-center z-20 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
-                  <Network className="text-cyan-500 h-5 w-5" />
+                <div className="w-11 h-11 rounded-full border-2 border-cyan-500 bg-slate-950 flex items-center justify-center z-20 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+                  <Network className="text-cyan-400 h-5 w-5" />
                 </div>
-                <span className="text-slate-600 text-[12px] mt-2 font-medium">Hub West</span>
+                <span className="text-slate-300 text-[12px] mt-2 font-medium">Hub West</span>
               </div>
             </div>
 
@@ -181,8 +181,8 @@ export default function GlobalMonitor() {
                 return (
                   <div key={h} className="flex flex-col items-center">
                     <div className={cn(
-                      "w-9 h-9 rounded-full border-2 bg-[#050A14] flex items-center justify-center text-xs font-bold z-20",
-                      isTraining ? "border-blue-500 text-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]" : "border-emerald-500 text-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]"
+                      "w-9 h-9 rounded-full border-2 bg-slate-950 flex items-center justify-center text-xs font-bold z-20",
+                      isTraining ? "border-blue-500 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.6)]" : "border-emerald-500 text-emerald-400 shadow-[0_0_8px_rgba(34,197,94,0.3)]"
                     )}>
                       {h}
                     </div>

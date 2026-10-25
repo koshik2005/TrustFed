@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/services/api';
 import type { FairnessReport } from '@/types';
@@ -11,6 +13,7 @@ type Row = FairnessReport['subgroupResults'][number] & { shapP?: number; topFeat
 const pct = (x: number | undefined | null) => (x == null || Number.isNaN(x) ? '—' : `${(x * 100).toFixed(1)}%`);
 
 export default function FairnessPage() {
+  const navigate = useNavigate();
   const [report, setReport] = useState<FairnessReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,7 +34,20 @@ export default function FairnessPage() {
     );
   }
   if (!report) {
-    return <p className="text-slate-600 text-sm">{error || 'No report yet.'} Run a training session first.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 max-w-lg mx-auto text-center">
+        <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center mb-4 text-blue-500 shadow-sm">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">No Fairness Audit Report Available</h2>
+        <p className="text-sm text-slate-600 mb-6">
+          {error || 'Fairness metrics are generated automatically on the held-out test cohort after a training session completes.'}
+        </p>
+        <Button onClick={() => navigate('/training')} className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold shadow-md">
+          Go to Global Training
+        </Button>
+      </div>
+    );
   }
 
   const rows = report.subgroupResults as Row[];

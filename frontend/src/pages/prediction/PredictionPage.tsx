@@ -86,7 +86,7 @@ export default function PredictionPage() {
                   <SelectTrigger className="bg-slate-50 border-slate-200 text-slate-900 h-10">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+                  <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
                     <SelectItem value="1">Male</SelectItem>
                     <SelectItem value="0">Female</SelectItem>
                   </SelectContent>
@@ -99,7 +99,7 @@ export default function PredictionPage() {
                   <SelectTrigger className="bg-slate-50 border-slate-200 text-slate-900 h-10">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+                  <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
                     <SelectItem value="1">Typical Angina</SelectItem>
                     <SelectItem value="2">Atypical Angina</SelectItem>
                     <SelectItem value="3">Non-anginal</SelectItem>
@@ -131,7 +131,7 @@ export default function PredictionPage() {
                   <SelectTrigger className="bg-slate-50 border-slate-200 text-slate-900 h-10">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+                  <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
                     <SelectItem value="0">Normal</SelectItem>
                     <SelectItem value="1">ST Abnormality</SelectItem>
                     <SelectItem value="2">LV Hypertrophy</SelectItem>
@@ -160,7 +160,7 @@ export default function PredictionPage() {
                 <Label className="text-slate-600 text-[12px] font-medium">ST Slope</Label>
                 <Select value={v.slope} onValueChange={(x) => setField('slope', String(x))}>
                   <SelectTrigger className="bg-slate-50 border-slate-200 text-slate-900 h-10"><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+                  <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
                     <SelectItem value="1">Upsloping</SelectItem>
                     <SelectItem value="2">Flat</SelectItem>
                     <SelectItem value="3">Downsloping</SelectItem>
@@ -177,7 +177,7 @@ export default function PredictionPage() {
                 <Label className="text-slate-600 text-[12px] font-medium">Thalassemia</Label>
                 <Select value={v.thal} onValueChange={(x) => setField('thal', String(x))}>
                   <SelectTrigger className="bg-slate-50 border-slate-200 text-slate-900 h-10"><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+                  <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
                     <SelectItem value="3">Normal</SelectItem>
                     <SelectItem value="6">Fixed defect</SelectItem>
                     <SelectItem value="7">Reversible defect</SelectItem>
@@ -190,7 +190,7 @@ export default function PredictionPage() {
             <Button
               onClick={handlePredict}
               disabled={loading}
-              className="w-full mt-6 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-slate-900 font-bold text-sm shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all border-none"
+              className="w-full mt-6 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-sm shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all border-none"
             >
               {loading ? (
                 <div className="flex items-center gap-2"><Activity className="w-4 h-4 animate-spin" /> Analyzing Model...</div>
@@ -221,7 +221,7 @@ export default function PredictionPage() {
                 {/* Circular Gauge */}
                 <div className="relative w-[180px] h-[180px] mb-8">
                   <svg className="w-full h-full rotate-[-90deg]" viewBox="0 0 160 160">
-                    <circle cx="80" cy="80" r="75" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                    <circle cx="80" cy="80" r="75" fill="none" stroke="#E2E8F0" strokeWidth="8" />
                     <motion.circle
                       initial={{ strokeDashoffset: arcLength }}
                       animate={{ strokeDashoffset: arcLength * (1 - (predictionResult?.riskScore || 0)) }}
@@ -257,7 +257,7 @@ export default function PredictionPage() {
                       {Math.round((predictionResult?.confidence || 0) * 100)}%
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.round((predictionResult?.confidence || 0) * 100)}%` }}
@@ -285,18 +285,18 @@ export default function PredictionPage() {
                   <Badge className="bg-slate-100 border-slate-200 text-slate-700 font-normal px-3 py-1">HR: {v.hr}</Badge>
                 </div>
 
-                <div className="w-full border-t border-slate-800 my-4"></div>
+                <div className="w-full border-t border-slate-200 my-4"></div>
 
                 {/* Actions */}
                 <div className="w-full flex flex-col gap-3 mt-2">
                   <Button
                     variant="outline"
-                    className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors w-full flex items-center justify-between"
+                    className="border-cyan-600/60 text-cyan-700 hover:bg-cyan-50 hover:text-cyan-800 transition-colors w-full flex items-center justify-between"
                     onClick={() => navigate('/explain')}
                   >
                     View SHAP Explanation <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                  <Button variant="ghost" className="text-slate-600 hover:text-slate-900 w-full border border-slate-700 hover:bg-slate-100">
+                  <Button variant="ghost" className="text-slate-600 hover:text-slate-900 w-full border border-slate-200 hover:bg-slate-50">
                     <Save className="w-4 h-4 mr-2" /> Save to Record
                   </Button>
                 </div>

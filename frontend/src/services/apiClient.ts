@@ -27,14 +27,17 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Response interceptor: handle 401 globally ────────────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('tf_token');
-      localStorage.removeItem('tf-auth');
-      window.location.href = '/login';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      const isOnLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+      if (!isLoginRequest && !isOnLoginPage) {
+        localStorage.removeItem('tf_token');
+        localStorage.removeItem('tf-auth');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

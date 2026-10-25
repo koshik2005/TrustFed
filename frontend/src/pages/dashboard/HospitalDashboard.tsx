@@ -60,7 +60,7 @@ export default function HospitalDashboard() {
           </div>
         </div>
 
-        <div className="bg-blue-500/12 border border-blue-500/30 text-blue-300 text-[13px] px-4 py-1.5 rounded-full font-medium flex items-center gap-2">
+        <div className="bg-blue-50 border border-blue-200 text-blue-600 text-[13px] px-4 py-1.5 rounded-full font-medium flex items-center gap-2">
           <RefreshCw className={`h-3.5 w-3.5 ${session?.status === 'running' ? 'animate-spin' : ''}`} />
           Round {session?.currentRound ?? 0} / {session?.totalRounds ?? 20} · {session?.status ?? 'Idle'}
         </div>
@@ -179,13 +179,13 @@ export default function HospitalDashboard() {
           <h2 className="text-slate-900 font-semibold text-lg mb-6">Training Activity</h2>
 
           <div className="relative pl-6 space-y-8 flex-grow">
-            <div className="absolute left-[11px] top-2 bottom-2 w-px border-l border-dashed border-slate-700" />
+            <div className="absolute left-[11px] top-2 bottom-2 w-px border-l border-dashed border-slate-300" />
 
             {[
-              { label: 'Dataset Loaded',        done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-400 h-4 w-4" /> },
-              { label: 'Model Initialized',     done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-400 h-4 w-4" /> },
-              { label: `LDP Applied — ε=${typeof privacyBudget === 'number' ? privacyBudget.toFixed(3) : '…'}`, done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-400 h-4 w-4" /> },
-              { label: session?.status === 'running' ? 'Encrypting Update…' : (session?.status === 'Completed' ? 'Updates Sent ✓' : 'Awaiting Session'), done: false, icon: session?.status === 'running' ? <RefreshCw className="text-blue-400 h-4 w-4 animate-spin" /> : <CheckCircle2 className="text-slate-500 h-4 w-4" /> },
+              { label: 'Dataset Loaded',        done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-500 h-4 w-4" /> },
+              { label: 'Model Initialized',     done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-500 h-4 w-4" /> },
+              { label: `LDP Applied — ε=${typeof privacyBudget === 'number' ? privacyBudget.toFixed(3) : '…'}`, done: currentRound >= 1, icon: <CheckCircle2 className="text-emerald-500 h-4 w-4" /> },
+              { label: session?.status === 'running' ? 'Encrypting Update…' : (session?.status === 'Completed' ? 'Updates Sent ✓' : 'Awaiting Session'), done: false, icon: session?.status === 'running' ? <RefreshCw className="text-blue-500 h-4 w-4 animate-spin" /> : <CheckCircle2 className="text-slate-400 h-4 w-4" /> },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -194,10 +194,10 @@ export default function HospitalDashboard() {
                 transition={{ delay: i * 0.1 }}
                 className="relative flex flex-col gap-1"
               >
-                <div className="absolute -left-[30px] bg-slate-50 rounded-full p-0.5">
+                <div className="absolute -left-[30px] bg-white rounded-full p-0.5">
                   {item.icon}
                 </div>
-                <div className={`text-sm ${item.done ? 'text-slate-800' : 'text-blue-400 font-medium'}`}>
+                <div className={`text-sm ${item.done ? 'text-slate-800' : 'text-blue-600 font-medium'}`}>
                   {item.label}
                 </div>
               </motion.div>

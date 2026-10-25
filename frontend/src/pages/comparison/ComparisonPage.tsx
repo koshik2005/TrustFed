@@ -10,11 +10,11 @@ import { api } from '@/services/api';
 
 const getBadgeStyle = (status: string) => {
   switch (status) {
-    case 'HIGH': return 'bg-red-500/15 text-red-300 border-red-500/30';
-    case 'MEDIUM': return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
-    case 'LOW': return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
-    case 'BEST': return 'bg-green-500/15 text-green-300 border-green-500/30';
-    default: return 'bg-slate-500/15 text-slate-700 border-slate-500/30';
+    case 'HIGH': return 'bg-red-50 text-red-700 border-red-300';
+    case 'MEDIUM': return 'bg-orange-50 text-orange-700 border-orange-300';
+    case 'LOW': return 'bg-yellow-50 text-yellow-700 border-yellow-300';
+    case 'BEST': return 'bg-green-50 text-green-700 border-green-300';
+    default: return 'bg-slate-100 text-slate-600 border-slate-300';
   }
 };
 
@@ -84,14 +84,14 @@ export default function ComparisonPage() {
       <Card className="glass-card bg-white border-slate-200 overflow-hidden relative z-10 shadow-lg">
         <div className="w-full overflow-x-auto">
           <Table>
-            <TableHeader className="bg-[#040810] border-b border-slate-200">
+            <TableHeader className="bg-slate-50 border-b border-slate-200">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">Model Name</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">Accuracy</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">Privacy Leakage (MIA ↓)</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">Fairness Score (↑)</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">Training Time</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 py-4 px-6 h-auto">HE Used</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">Model Name</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">Accuracy</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">Privacy Leakage (MIA ↓)</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">Fairness Score (↑)</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">Training Time</TableHead>
+                <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-6 h-auto">HE Used</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="text-[13px] text-slate-800">
@@ -101,8 +101,8 @@ export default function ComparisonPage() {
                   className={cn(
                     "transition-colors",
                     row.special 
-                      ? "bg-blue-500/[0.07] hover:bg-blue-500/[0.1] border-l-4 border-l-blue-500 border-b border-slate-200" 
-                      : "border-b border-slate-200 hover:bg-white/[0.02]"
+                      ? "bg-blue-50/70 hover:bg-blue-50 border-l-4 border-l-blue-500 border-b border-slate-200" 
+                      : "border-b border-slate-200 hover:bg-slate-50/80"
                   )}
                 >
                   <TableCell className={cn("py-4 px-6 font-medium", row.special ? "text-slate-900" : "text-slate-800")}>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { api } from '@/services/api';
 import type { PredictionResult } from '@/types';
 
 export default function ExplainPage() {
+  const navigate = useNavigate();
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -99,7 +101,7 @@ export default function ExplainPage() {
 
               <div className="relative w-full py-4 flex flex-col gap-2">
                 {/* Central Axis */}
-                <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-slate-700 z-0"></div>
+                <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-slate-300 z-0"></div>
 
                 {/* Data Bars */}
                 {shapData.length === 0 && (
@@ -121,7 +123,7 @@ export default function ExplainPage() {
                             transition={{ duration: 0.8, delay: i * 0.15, ease: 'easeOut' }}
                             className="absolute right-4 top-1 bg-blue-500 h-6 rounded-l-md flex items-center justify-end pr-2"
                           >
-                            <span className="font-mono text-[11px] text-slate-900 font-bold mr-1 drop-shadow-md">{item.value.toFixed(2)}</span>
+                            <span className="font-mono text-[11px] text-white font-bold mr-1 drop-shadow-md">{item.value.toFixed(2)}</span>
                           </motion.div>
                           <span className="text-slate-800 text-sm mt-1.5 mr-[90px] z-20 whitespace-nowrap">{item.feature}</span>
                         </>
@@ -139,7 +141,7 @@ export default function ExplainPage() {
                           transition={{ duration: 0.8, delay: i * 0.15, ease: 'easeOut' }}
                           className="bg-red-400 h-6 mt-1 rounded-r-md flex items-center pl-2"
                         >
-                          <span className="font-mono text-[11px] text-slate-900 font-bold ml-2 drop-shadow-md">+{item.value.toFixed(2)}</span>
+                          <span className="font-mono text-[11px] text-white font-bold ml-2 drop-shadow-md">+{item.value.toFixed(2)}</span>
                         </motion.div>
                       )}
                     </div>
@@ -154,15 +156,15 @@ export default function ExplainPage() {
         {/* Right Card: AI Clinical Explanation */}
         <div className="lg:col-span-5 relative">
           <div className="animated-border h-full">
-            <Card className="glass-card bg-[#0b101a] border-slate-200 h-full relative z-10">
+            <Card className="glass-card bg-white border-slate-200 h-full relative z-10 shadow-lg">
               <CardContent className="p-6 flex flex-col justify-between h-full">
                 <div className="flex flex-col gap-4">
                   <div className="flex justify-between items-start">
                     <h2 className="text-lg font-semibold text-slate-900">AI Clinical Explanation</h2>
-                    <BrainCircuit className="text-cyan-400 animate-pulse h-6 w-6" />
+                    <BrainCircuit className="text-cyan-500 animate-pulse h-6 w-6" />
                   </div>
                   
-                  <Badge className="bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border-cyan-500/20 font-mono text-[11px] w-fit">
+                  <Badge className="bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 border-cyan-500/20 font-mono text-[11px] w-fit">
                     Narrative: LLM (if configured) or template
                   </Badge>
 
@@ -184,7 +186,7 @@ export default function ExplainPage() {
                   <span className="flex items-center gap-1">
                     <Timer className="h-4 w-4" /> Exact SHAP (all 2^13 coalitions)
                   </span>
-                  <span className="flex items-center gap-1 text-blue-400 cursor-pointer hover:underline">
+                  <span onClick={() => navigate('/audit')} className="flex items-center gap-1 text-blue-500 hover:text-blue-700 cursor-pointer hover:underline font-sans font-medium">
                     View Full Log <ArrowRight className="h-3 w-3" />
                   </span>
                 </div>

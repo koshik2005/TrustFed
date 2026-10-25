@@ -94,7 +94,7 @@ export default function RegionalPage() {
               <Network className="text-cyan-400 w-5 h-5 fill-cyan-400/20" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-cyan-400 tracking-tight">{hospitals.length} / {hospitals.length}</div>
+              <div className="text-3xl font-bold text-cyan-700 tracking-tight">{hospitals.length} / {hospitals.length}</div>
               <div className="font-mono text-xs text-slate-500 mt-2">All nodes ready</div>
             </div>
           </CardContent>
@@ -102,8 +102,7 @@ export default function RegionalPage() {
       </div>
 
       {/* SMPC VISUALIZATION CARD */}
-      <Card className="glass-card bg-white border-slate-200 relative overflow-hidden z-10">
-        <div className="absolute inset-0 bg-[#050A14] opacity-40 z-0"></div>
+      <Card className="glass-card bg-white border-slate-200 relative overflow-hidden z-10 shadow-lg">
         <CardContent className="p-6 relative z-10">
           
           <div className="flex items-center gap-2 mb-8">
@@ -147,7 +146,7 @@ export default function RegionalPage() {
             {/* Center Hub */}
             <div className="flex flex-col items-center justify-center z-10 glass-card bg-white border-blue-500/30 p-4 rounded-full w-24 h-24 shadow-[0_0_24px_rgba(59,130,246,0.2)]">
               <Lock className="text-blue-500 w-7 h-7 mb-1 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)] fill-blue-500/20" />
-              <span className="text-[9px] uppercase font-bold text-blue-400 tracking-widest text-center leading-tight">Secret<br/>Shares</span>
+              <span className="text-[9px] uppercase font-bold text-blue-500 tracking-widest text-center leading-tight">Secret<br/>Shares</span>
             </div>
 
             {/* Right Aggregate */}
@@ -171,10 +170,10 @@ export default function RegionalPage() {
       </Card>
 
       {/* HOSPITAL STATUS TABLE */}
-      <Card className="glass-card bg-[#050A14]/80 border-slate-200 overflow-hidden relative z-10">
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-[#050A14]/50">
+      <Card className="glass-card bg-white border-slate-200 overflow-hidden relative z-10 shadow-lg">
+        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/70">
           <h3 className="font-semibold text-lg text-slate-900">Connected Hospital Nodes</h3>
-          <Button onClick={fetchHospitals} variant="ghost" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs font-semibold uppercase tracking-wider h-8">
+          <Button onClick={fetchHospitals} variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-semibold uppercase tracking-wider h-8">
             <RefreshCw className="w-3 h-3 mr-2" /> REFRESH
           </Button>
         </div>
@@ -199,7 +198,7 @@ export default function RegionalPage() {
                     <TableCell className="py-4">
                       <Badge className={cn(
                         "bg-transparent border px-2 py-0.5 text-[11px] font-medium tracking-wide flex items-center gap-1.5 w-fit uppercase",
-                        isTraining ? "border-blue-500/30 text-blue-400 bg-blue-500/10" : "border-cyan-400/30 text-cyan-400 bg-cyan-400/10"
+                        isTraining ? "border-blue-300 text-blue-700 bg-blue-50" : "border-cyan-300 text-cyan-700 bg-cyan-50"
                       )}>
                         <span className={cn("w-1.5 h-1.5 rounded-full", isTraining ? "bg-blue-400 animate-pulse" : "bg-cyan-400")}></span>
                         {node.status}
@@ -210,7 +209,7 @@ export default function RegionalPage() {
                     <TableCell className="py-4">
                       <div className={cn(
                         "inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded uppercase",
-                        isTraining ? "text-amber-400 bg-amber-400/10" : "text-emerald-400 bg-emerald-400/10"
+                        isTraining ? "text-amber-700 bg-amber-50" : "text-emerald-700 bg-emerald-50"
                       )}>
                         {isTraining ? <Hourglass className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                         {isTraining ? 'Pending' : 'Received'}

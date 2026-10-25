@@ -13,10 +13,10 @@ import type { AuditEntry, PaginatedResponse } from '@/types';
 
 const getEventBadgeStyle = (event: string) => {
   switch (event) {
-    case 'TRAINING': return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-    case 'TEFL': return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-    case 'AUTH': return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-    default: return 'bg-slate-500/15 text-slate-700 border-slate-500/30';
+    case 'TRAINING': return 'bg-blue-50 text-blue-700 border-blue-300';
+    case 'TEFL': return 'bg-purple-50 text-purple-700 border-purple-300';
+    case 'AUTH': return 'bg-amber-50 text-amber-700 border-amber-300';
+    default: return 'bg-slate-100 text-slate-600 border-slate-300';
   }
 };
 
@@ -51,7 +51,7 @@ export default function AuditPage() {
           <h1 className="text-[24px] font-bold text-slate-900 mb-1 tracking-tight">Immutable Audit Log</h1>
           <p className="text-slate-600 text-[13px]">Append-only cryptographic event ledger · HIPAA / GDPR Compliant</p>
         </div>
-        <Button variant="outline" className="border-slate-600 text-slate-700 hover:text-slate-900 hover:bg-slate-800 transition-colors">
+        <Button variant="outline" className="border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors">
           <Download className="w-4 h-4 mr-2" /> Export Logs
         </Button>
       </div>
@@ -80,7 +80,7 @@ export default function AuditPage() {
             <SelectTrigger className="w-[160px] bg-white border-slate-200 text-slate-800 h-9">
               <SelectValue placeholder="All Events" />
             </SelectTrigger>
-            <SelectContent className="bg-[#0f172a] border-slate-200 text-slate-800">
+            <SelectContent className="bg-white border-slate-200 text-slate-900 shadow-xl">
               <SelectItem value="all">All Events</SelectItem>
               <SelectItem value="training">Training</SelectItem>
               <SelectItem value="tefl">TEFL</SelectItem>
@@ -91,7 +91,7 @@ export default function AuditPage() {
           <Input className="w-[200px] bg-white border-slate-200 text-slate-800 focus:border-blue-500 h-9" placeholder="Filter by node ID..." />
 
           <div className="ml-auto flex gap-2">
-            <Button className="bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 h-9">
+            <Button className="bg-blue-500/20 text-blue-600 border border-blue-500/30 hover:bg-blue-500/30 h-9">
               Apply Filters
             </Button>
             <Button variant="ghost" className="text-slate-600 hover:text-slate-900 h-9">
@@ -106,21 +106,21 @@ export default function AuditPage() {
       <Card className="glass-card bg-white border-slate-200 overflow-hidden relative z-10 shadow-lg">
         <div className="w-full overflow-x-auto">
           <Table>
-            <TableHeader className="bg-[#040810] border-b border-slate-200">
+            <TableHeader className="bg-slate-50 border-b border-slate-200">
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto w-12">#</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto w-48">Timestamp</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto w-32">Node</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto w-32">Event</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto">Description</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 py-3 px-4 h-auto w-40">Hash</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-3 px-4 h-auto w-12">#</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-3 px-4 h-auto w-48">Timestamp</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-4 px-4 h-auto w-32">Node</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-3 px-4 h-auto w-32">Event</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-3 px-4 h-auto">Description</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 py-3 px-4 h-auto w-40">Hash</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="text-[13px] text-slate-800">
               {logs?.items.map((row) => (
                 <TableRow 
                   key={row.id} 
-                  className="border-t border-slate-200 hover:bg-slate-50 even:bg-white/[0.015] transition-colors"
+                  className="border-t border-slate-200 hover:bg-slate-50 even:bg-slate-50/40 transition-colors"
                 >
                   <TableCell className="py-3 px-4 text-slate-500">{row.id}</TableCell>
                   <TableCell className="py-3 px-4 font-mono text-[12px] text-slate-700">
@@ -151,7 +151,7 @@ export default function AuditPage() {
         </div>
 
         {/* Pagination Bar */}
-        <div className="px-4 py-3 border-t border-slate-200 flex justify-between items-center bg-[#050A14]/50">
+        <div className="px-4 py-3 border-t border-slate-200 flex justify-between items-center bg-slate-50/70">
           <span className="text-slate-600 text-[13px]">Showing 1–20 of 1,847 entries</span>
           
           <div className="flex items-center gap-1 text-sm text-slate-600">
