@@ -1,11 +1,23 @@
 import axios from 'axios';
 
+const getBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim();
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://trustfed-backend.onrender.com/api';
+  }
+  return 'http://localhost:8000/api';
+};
+
 // Central Axios instance — all API calls go through here
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
+  baseURL: getBaseUrl(),
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
+
 
 // ── Request interceptor: attach JWT ──────────────────────────────────────────
 apiClient.interceptors.request.use((config) => {
