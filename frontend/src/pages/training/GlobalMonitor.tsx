@@ -143,8 +143,11 @@ export default function GlobalMonitor() {
       {/* MAIN DASHBOARD GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Network Diagram */}
-        <Card className="glass-card col-span-1 lg:col-span-2 bg-slate-900 border-slate-800 text-slate-100 overflow-hidden relative h-[360px] flex flex-col shadow-xl">
+        {/* Network Diagram — intentionally dark card, NOT using glass-card which forces white bg */}
+        <Card
+          className="col-span-1 lg:col-span-2 overflow-hidden relative h-[360px] flex flex-col shadow-xl rounded-xl"
+          style={{ background: '#0F172A', border: '1px solid #1E293B' }}
+        >
           <div className="p-4 border-b border-slate-800 relative z-30">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-200">FL Hierarchy — Live Network</h2>
           </div>
@@ -198,35 +201,21 @@ export default function GlobalMonitor() {
               })}
             </div>
 
-            {/* SVG Connecting Lines */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-60">
+            {/* SVG Connecting Lines — uses viewBox so numeric coords map to percentages */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-60" viewBox="0 0 100 100" preserveAspectRatio="none">
               {/* Hub to Global */}
-              <path d="M 50% 25% L 35% 50%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
-              <path d="M 50% 25% L 65% 50%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
+              <line x1="50" y1="22" x2="35" y2="48" stroke="#1E3A5F" strokeWidth="0.4" />
+              <line x1="50" y1="22" x2="65" y2="48" stroke="#1E3A5F" strokeWidth="0.4" />
               
               {/* Hospitals to Hub East (Left) */}
-              <path d="M 35% 50% L 10% 80%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
-              <path d="M 35% 50% L 30% 80%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
-              <path d="M 35% 50% L 50% 80%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
+              <line x1="35" y1="48" x2="10" y2="78" stroke="#1E3A5F" strokeWidth="0.3" />
+              <line x1="35" y1="48" x2="30" y2="78" stroke="#1E3A5F" strokeWidth="0.3" />
+              <line x1="35" y1="48" x2="50" y2="78" stroke="#1E3A5F" strokeWidth="0.3" />
 
               {/* Hospitals to Hub West (Right) */}
-              <path d="M 65% 50% L 70% 80%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
-              <path d="M 65% 50% L 90% 80%" stroke="#1E3A5F" strokeWidth="2" fill="none" />
+              <line x1="65" y1="48" x2="70" y2="78" stroke="#1E3A5F" strokeWidth="0.3" />
+              <line x1="65" y1="48" x2="90" y2="78" stroke="#1E3A5F" strokeWidth="0.3" />
             </svg>
-
-            {/* Simulated Data Packets flowing up */}
-            <motion.div
-              animate={{ offsetDistance: ["100%", "0%"], opacity: [0, 1, 0] }}
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="absolute w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#06B6D4] z-15"
-              style={{ offsetPath: "path('M 50% 25% L 35% 50%')", left: 0, top: 0 }}
-            />
-            <motion.div
-              animate={{ offsetDistance: ["100%", "0%"], opacity: [0, 1, 0] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: "linear", delay: 0.5 }}
-              className="absolute w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#06B6D4] z-15"
-              style={{ offsetPath: "path('M 50% 25% L 65% 50%')", left: 0, top: 0 }}
-            />
             
           </div>
         </Card>
@@ -272,9 +261,9 @@ export default function GlobalMonitor() {
                   tickFormatter={(val) => val.toFixed(2)}
                 />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-                  itemStyle={{ color: '#e2e8f0' }}
-                  labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  itemStyle={{ color: '#334155' }}
+                  labelStyle={{ color: '#64748b', marginBottom: '4px' }}
                 />
                 
                 {/* Current Round Reference Line */}
@@ -288,7 +277,7 @@ export default function GlobalMonitor() {
                   name="Accuracy"
                   stroke="#3B82F6" 
                   strokeWidth={3}
-                  dot={{ r: 4, fill: '#0f172a', stroke: '#3B82F6', strokeWidth: 2 }}
+                  dot={{ r: 4, fill: '#ffffff', stroke: '#3B82F6', strokeWidth: 2 }}
                   activeDot={{ r: 6, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }}
                   connectNulls
                 />
@@ -302,7 +291,7 @@ export default function GlobalMonitor() {
                   stroke="#F97316" 
                   strokeWidth={2}
                   strokeDasharray="5 5"
-                  dot={{ r: 3, fill: '#0f172a', stroke: '#F97316', strokeWidth: 2 }}
+                  dot={{ r: 3, fill: '#ffffff', stroke: '#F97316', strokeWidth: 2 }}
                   connectNulls
                 />
               </LineChart>

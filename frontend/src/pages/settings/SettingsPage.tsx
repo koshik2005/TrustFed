@@ -9,7 +9,16 @@ import { Label } from '@/components/ui/label';
 import { AlertTriangle, Sliders, Shield, Building2, Bell, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const NAV_ITEMS = [
+  { id: 'fl-params', label: 'FL Parameters', icon: Sliders },
+  { id: 'privacy', label: 'Privacy Config', icon: Shield },
+  { id: 'hospital', label: 'Hospital Config', icon: Building2 },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'security', label: 'Security', icon: Lock },
+];
+
 export default function SettingsPage() {
+  const [activeSection, setActiveSection] = useState('fl-params');
   const [rounds, setRounds] = useState([20]);
   const [epochs, setEpochs] = useState([1]);
   const [lr, setLr] = useState("0.1");
@@ -32,6 +41,12 @@ export default function SettingsPage() {
   // In a real app, this would check against initial state
   const hasUnsavedChanges = true;
 
+  const scrollToSection = (id: string) => {
+    setActiveSection(id);
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -50,21 +65,25 @@ export default function SettingsPage() {
             <CardContent className="p-4">
               <h2 className="text-lg font-bold text-slate-900 mb-4 px-2">Settings</h2>
               <nav className="flex flex-col gap-1">
-                <a href="#" className="px-3 py-2 rounded-lg bg-blue-500/10 border-l-4 border-blue-500 text-slate-900 font-medium flex items-center gap-3 transition-colors">
-                  <Sliders className="w-4 h-4 text-blue-400" /> FL Parameters
-                </a>
-                <a href="#" className="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors flex items-center gap-3">
-                  <Shield className="w-4 h-4" /> Privacy Config
-                </a>
-                <a href="#" className="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors flex items-center gap-3">
-                  <Building2 className="w-4 h-4" /> Hospital Config
-                </a>
-                <a href="#" className="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors flex items-center gap-3">
-                  <Bell className="w-4 h-4" /> Notifications
-                </a>
-                <a href="#" className="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors flex items-center gap-3">
-                  <Lock className="w-4 h-4" /> Security
-                </a>
+                {NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => scrollToSection(item.id)}
+                      className={cn(
+                        "px-3 py-2 rounded-lg flex items-center gap-3 transition-colors text-left w-full",
+                        isActive
+                          ? "bg-blue-50 border-l-4 border-blue-500 text-slate-900 font-medium"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-l-4 border-transparent"
+                      )}
+                    >
+                      <Icon className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-slate-400")} />
+                      {item.label}
+                    </button>
+                  );
+                })}
               </nav>
             </CardContent>
           </Card>
@@ -74,7 +93,7 @@ export default function SettingsPage() {
         <div className="flex-1 max-w-3xl">
           
           {/* FL Parameters Section */}
-          <div className="mb-10">
+          <div id="fl-params" className="mb-10 scroll-mt-20">
             <div className="mb-6">
               <h2 className="text-[20px] font-bold text-slate-900">Federated Learning Parameters</h2>
               <p className="text-sm text-slate-600 mt-1">Configure the global FL training session</p>
@@ -91,7 +110,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-4 sm:w-[40%]">
                     <Slider value={rounds} onValueChange={(v) => setRounds(v as number[])} max={100} min={1} step={1} className="w-full" />
-                    <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded text-sm font-mono border border-blue-500/30 min-w-[3rem] text-center">
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-mono border border-blue-200 min-w-[3rem] text-center">
                       {rounds[0]}
                     </span>
                   </div>
@@ -105,7 +124,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-4 sm:w-[40%]">
                     <Slider value={epochs} onValueChange={(v) => setEpochs(v as number[])} max={20} min={1} step={1} className="w-full" />
-                    <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded text-sm font-mono border border-blue-500/30 min-w-[3rem] text-center">
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-mono border border-blue-200 min-w-[3rem] text-center">
                       {epochs[0]}
                     </span>
                   </div>
@@ -134,7 +153,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Privacy Configuration Section */}
-          <div>
+          <div id="privacy" className="mb-10 scroll-mt-20">
             <div className="mb-6">
               <h2 className="text-[20px] font-bold text-slate-900">Privacy Configuration</h2>
             </div>
@@ -147,7 +166,7 @@ export default function SettingsPage() {
                   <Label className="sm:max-w-[60%] text-slate-900 font-medium text-base">Target Epsilon (ε) — noise is calibrated to meet it</Label>
                   <div className="flex items-center gap-4 sm:w-[40%]">
                     <Slider value={epsilon} onValueChange={(v) => setEpsilon(v as number[])} max={5.0} min={0.5} step={0.1} className="w-full" />
-                    <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded text-sm font-mono border border-emerald-500/30 min-w-[3.5rem] text-center">
+                    <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded text-sm font-mono border border-emerald-200 min-w-[3.5rem] text-center">
                       {epsilon[0].toFixed(1)}
                     </span>
                   </div>
@@ -158,7 +177,7 @@ export default function SettingsPage() {
                   <Label className="sm:max-w-[60%] text-slate-900 font-medium text-base">Noise Multiplier (σ) — auto-calibrated</Label>
                   <div className="flex items-center gap-4 sm:w-[40%]">
                     <Slider disabled value={noise} onValueChange={(v) => setNoise(v as number[])} max={8.0} min={0.5} step={0.1} className="w-full" />
-                    <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded text-sm font-mono border border-blue-500/30 min-w-[3.5rem] text-center">
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-sm font-mono border border-blue-200 min-w-[3.5rem] text-center">
                       auto
                     </span>
                   </div>
@@ -173,7 +192,7 @@ export default function SettingsPage() {
                 {/* Row 9 */}
                 <div className="flex items-center justify-between pb-6 border-b border-slate-200">
                   <Label className="text-slate-900 font-medium text-base cursor-pointer" htmlFor="agpm">Secure aggregation (additive secret sharing)</Label>
-                  <Switch id="agpm" checked={agpm} onCheckedChange={setAgpm} className="data-[state=checked]:bg-cyan-400" />
+                  <Switch id="agpm" checked={agpm} onCheckedChange={setAgpm} className="data-[state=checked]:bg-cyan-500" />
                 </div>
 
                 {/* Row 10 */}
@@ -182,6 +201,45 @@ export default function SettingsPage() {
                   <Switch id="he" checked={he} onCheckedChange={setHe} className="data-[state=checked]:bg-blue-500" />
                 </div>
 
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Hospital Config — placeholder section */}
+          <div id="hospital" className="mb-10 scroll-mt-20">
+            <div className="mb-6">
+              <h2 className="text-[20px] font-bold text-slate-900">Hospital Configuration</h2>
+              <p className="text-sm text-slate-600 mt-1">Manage connected hospital nodes</p>
+            </div>
+            <Card className="glass-card bg-white border-slate-200">
+              <CardContent className="p-8 text-center text-slate-500 text-sm">
+                Hospital node configuration is managed automatically by the federated orchestrator. Visit the <span className="text-blue-600 font-medium">Regional Hub</span> page to view connected nodes.
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notifications — placeholder section */}
+          <div id="notifications" className="mb-10 scroll-mt-20">
+            <div className="mb-6">
+              <h2 className="text-[20px] font-bold text-slate-900">Notifications</h2>
+              <p className="text-sm text-slate-600 mt-1">Configure alerts and notifications</p>
+            </div>
+            <Card className="glass-card bg-white border-slate-200">
+              <CardContent className="p-8 text-center text-slate-500 text-sm">
+                Notification preferences will be available in a future release.
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Security — placeholder section */}
+          <div id="security" className="scroll-mt-20">
+            <div className="mb-6">
+              <h2 className="text-[20px] font-bold text-slate-900">Security</h2>
+              <p className="text-sm text-slate-600 mt-1">Encryption and access control settings</p>
+            </div>
+            <Card className="glass-card bg-white border-slate-200">
+              <CardContent className="p-8 text-center text-slate-500 text-sm">
+                Security settings are enforced at the infrastructure level. View the <span className="text-blue-600 font-medium">Privacy Report</span> page for current encryption status.
               </CardContent>
             </Card>
           </div>
@@ -216,3 +274,4 @@ export default function SettingsPage() {
     </motion.div>
   );
 }
+

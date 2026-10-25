@@ -164,8 +164,8 @@ export default function HospitalDashboard() {
                   <XAxis dataKey="epoch" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v.toFixed(1)} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0F1629', borderColor: '#1D6BF3', borderRadius: '8px', opacity: 0.95 }}
-                    itemStyle={{ color: '#B8C7E0' }}
+                    contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    itemStyle={{ color: '#334155' }}
                   />
                   <Area type="monotone" dataKey="dpLoss"   name="With DP"    stroke="#1D6BF3" strokeWidth={2} fillOpacity={1} fill="url(#dpGradient)" />
                 </AreaChart>
