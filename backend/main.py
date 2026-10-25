@@ -31,6 +31,8 @@ app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True
 
 from api.v1.routes import router as api_router      # noqa: E402
 app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
+
 
 
 @app.get("/")
