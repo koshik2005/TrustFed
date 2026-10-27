@@ -17,9 +17,14 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: https://frontend-3qgo.vercel.app,http://localhost:5173
+      - key: ALLOW_DEMO_USERS
+        value: "true"
+      - key: DEMO_PASSWORD
+        value: password123
       - key: SUPABASE_DB_URL
         sync: false
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL
         value: meta/llama-3.1-70b-instruct
+

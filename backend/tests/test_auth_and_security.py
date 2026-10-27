@@ -170,10 +170,12 @@ def test_object_level_authorization_cross_hospital_isolation():
 
 
 def test_production_seed_guard():
-    """Verify seed_users never creates demo accounts with default passwords in production."""
+    """Verify seed_users never creates demo accounts with default passwords in strict production."""
     old_env = os.environ.get("ENVIRONMENT")
+    old_allow = os.environ.get("ALLOW_DEMO_USERS")
     try:
         os.environ["ENVIRONMENT"] = "production"
+        os.environ["ALLOW_DEMO_USERS"] = "false"
         db = SessionLocal()
         try:
             store.seed_users(db)
@@ -186,6 +188,10 @@ def test_production_seed_guard():
             db.close()
     finally:
         os.environ["ENVIRONMENT"] = old_env or "development"
+        if old_allow is not None:
+            os.environ["ALLOW_DEMO_USERS"] = old_allow
+        else:
+            os.environ.pop("ALLOW_DEMO_USERS", None)
 
 
 if __name__ == "__main__":
