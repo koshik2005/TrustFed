@@ -15,8 +15,10 @@ backend/trustfed.db
 
 # Machine Learning Artifacts & Data Caches
 backend/artifacts/*.npz
+!backend/artifacts/pretrained_cleveland.npz
 backend/data/*.data
 *.npz
+!pretrained_cleveland.npz
 
 # Python
 __pycache__/

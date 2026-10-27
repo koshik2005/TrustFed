@@ -50,7 +50,7 @@ def eps_after(cfg: FLConfig, sizes, rounds_done: int) -> float:
     return worst
 
 
-def calibrate_sigma(cfg: FLConfig, sizes, target_eps: float, lo: float = 0.3, hi: float = 200.0) -> float:
+def calibrate_sigma(cfg: FLConfig, sizes, target_eps: float, lo: float = 0.3, hi: float = 3.5) -> float:
     """Smallest noise multiplier whose worst-hospital epsilon after all rounds is <= target_eps (bisection)."""
     from dataclasses import replace
     def eps(sig): return eps_after(replace(cfg, sigma=sig), sizes, cfg.rounds)

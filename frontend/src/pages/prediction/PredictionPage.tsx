@@ -25,8 +25,8 @@ const PRESETS = [
     name: 'Moderate Risk (Borderline Angina)',
     icon: '🟡',
     values: {
-      age: '54', sex: '0', cp: '2', bp: '138', chol: '228', fbs: false, ecg: '1',
-      hr: '148', exang: false, oldpeak: '1.2', slope: '2', ca: '0', thal: '6',
+      age: '55', sex: '1', cp: '2', bp: '135', chol: '240', fbs: false, ecg: '1',
+      hr: '140', exang: true, oldpeak: '1.2', slope: '2', ca: '0', thal: '6',
     },
   },
   {
@@ -325,12 +325,19 @@ export default function PredictionPage() {
                       Key Risk Driving Factors (SHAP)
                     </div>
                     <div className="space-y-1.5">
-                      {predictionResult.shapValues.slice(0, 3).map((s: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100">
-                          <span className="text-slate-700 font-medium">{s.feature}</span>
-                          <span className="font-mono font-semibold text-red-600">+{s.value} ({s.featureValue})</span>
-                        </div>
-                      ))}
+                      {predictionResult.shapValues.slice(0, 3).map((s: any, idx: number) => {
+                        const numVal = typeof s.value === 'number' ? s.value : parseFloat(s.value || '0');
+                        const isPositive = numVal >= 0;
+                        const formattedVal = (isPositive ? '+' : '') + numVal.toFixed(2);
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100">
+                            <span className="text-slate-700 font-medium">{s.feature}</span>
+                            <span className={cn("font-mono font-semibold", isPositive ? "text-red-600" : "text-emerald-600")}>
+                              {formattedVal} ({s.featureValue})
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
