@@ -11,12 +11,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DEMO_PASSWORD
-        value: password123
       - key: CORS_ORIGINS
-        value: https://*.vercel.app,http://localhost:5173
+        value: https://frontend-3qgo.vercel.app,http://localhost:5173
       - key: SUPABASE_DB_URL
         sync: false
       - key: NVIDIA_API_KEY

@@ -47,6 +47,8 @@ class PatientPrediction(Base):
     id = Column(Integer, primary_key=True, index=True)
     patient_identifier = Column(String, index=True)
     session_id = Column(String, nullable=True)
+    hospital_id = Column(String, index=True, nullable=True)
+    user_id = Column(Integer, index=True, nullable=True)
     age = Column(Integer)
     risk_score = Column(Float)
     confidence = Column(Float)
@@ -102,3 +104,15 @@ class PrivacyReport(Base):
     he_key_size = Column(Integer, default=0)
     paillier_enabled = Column(Boolean, default=False)
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    jti = Column(String, unique=True, index=True, nullable=False)
+    csrf_token = Column(String, nullable=False)
+    revoked = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+

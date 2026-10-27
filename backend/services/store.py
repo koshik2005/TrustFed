@@ -15,6 +15,20 @@ _audit_lock = threading.Lock()
 
 
 def seed_users(db: Session):
+    env = os.getenv("ENVIRONMENT", "development").strip().lower()
+    is_prod = env in ("production", "prod") or bool(os.getenv("RENDER"))
+    if is_prod:
+        # NEVER seed demo users in production. Disable any legacy demo accounts using default password.
+        import secrets
+        for email, _, _, _ in DEMO_USERS:
+            existing = db.query(models.User).filter_by(email=email).first()
+            if existing and auth.verify_password("password123", existing.password_hash):
+                existing.password_hash = f"DISABLED${secrets.token_hex(32)}"
+                db.commit()
+                print(f"[SECURITY] Disabled un-rotated demo account in production: {email}")
+        print("[INFO] Production mode active: demo user seeding skipped.")
+        return
+
     pw = os.getenv("DEMO_PASSWORD", "password123")
     for email, name, role, hid in DEMO_USERS:
         if not db.query(models.User).filter_by(email=email).first():
@@ -22,7 +36,7 @@ def seed_users(db: Session):
                                password_hash=auth.hash_password(pw)))
     db.commit()
     if pw == "password123":
-        print("[WARN] Demo users use the default password. Set DEMO_PASSWORD in .env for anything non-local.")
+        print("[WARN] Demo users use default password. Set DEMO_PASSWORD in .env for non-local environments.")
 
 
 def add_audit(db: Session, session_id, node_id, event_type, description) -> models.AuditLog:
