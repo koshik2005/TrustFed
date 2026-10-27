@@ -187,13 +187,29 @@ export const auditApi = {
   },
 };
 
+export interface LoginResponse {
+  token: string;
+  user: User;
+  csrf_token?: string;
+  expires_in?: number;
+}
+
 export const authApi = {
-  login: async (email: string, password: string): Promise<{ token: string; user: User }> => {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
     try {
-      const res = await apiClient.post<{ token: string; user: User }>('/auth/login', { email, password });
+      const res = await apiClient.post<LoginResponse>('/auth/login', { email, password });
       return res.data;
-    } catch {
-      // Offline fallback: match user by role or email
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { detail?: string; message?: string } } };
+      // If server explicitly returned 401, 400, 429, etc., propagate the exact error message
+      if (axiosErr.response) {
+        const errorMsg =
+          axiosErr.response.data?.detail ||
+          axiosErr.response.data?.message ||
+          (axiosErr.response.status === 429 ? 'Rate limit exceeded. Please wait a moment.' : 'Invalid email or password.');
+        throw new Error(errorMsg);
+      }
+      // Server unreachable / offline demo fallback
       let user: User = MOCK_USERS.hospital_staff;
       if (email.includes('admin') || email.startsWith('admin@')) {
         user = MOCK_USERS.global_admin;
@@ -201,8 +217,21 @@ export const authApi = {
         user = MOCK_USERS.regional_admin;
       }
       const token = `tf-mock-jwt-${user.role}-${Date.now()}`;
-      return { token, user };
+      return { token, user, csrf_token: 'mock-csrf' };
     }
+  },
+
+  logout: async (): Promise<void> => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch {
+      // Client-side cleanup occurs in authStore
+    }
+  },
+
+  refresh: async (): Promise<LoginResponse> => {
+    const res = await apiClient.post<LoginResponse>('/auth/refresh');
+    return res.data;
   },
 };
 

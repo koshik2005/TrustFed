@@ -13,18 +13,21 @@ import type { Hospital } from '@/types';
 export default function RegionalPage() {
   const [hospitals, setHospitals] = React.useState<Hospital[]>([]);
 
-  const fetchHospitals = async () => {
-    try {
-      const data = await api.trainingApi.getHospitals();
-      setHospitals(data);
-    } catch (e) {
-      console.error("Failed to load hospitals", e);
-    }
-  };
-
   React.useEffect(() => {
-    fetchHospitals();
+    let ignore = false;
+    api.trainingApi.getHospitals().then((data) => {
+      if (!ignore) setHospitals(data);
+    }).catch((e) => {
+      console.error('Failed to load hospitals', e);
+    });
+    return () => {
+      ignore = true;
+    };
   }, []);
+
+  const handleRefresh = () => {
+    api.trainingApi.getHospitals().then(setHospitals).catch(console.error);
+  };
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -173,7 +176,7 @@ export default function RegionalPage() {
       <Card className="glass-card bg-white border-slate-200 overflow-hidden relative z-10 shadow-lg">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/70">
           <h3 className="font-semibold text-lg text-slate-900">Connected Hospital Nodes</h3>
-          <Button onClick={fetchHospitals} variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-semibold uppercase tracking-wider h-8">
+          <Button onClick={handleRefresh} variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-semibold uppercase tracking-wider h-8">
             <RefreshCw className="w-3 h-3 mr-2" /> REFRESH
           </Button>
         </div>

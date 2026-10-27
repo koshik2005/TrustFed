@@ -31,8 +31,7 @@ export default function HospitalDashboard() {
   }, []);
 
   // Build dynamic loss chart data from session round progress
-  const totalRounds = session?.totalRounds || 5;
-  const currentRound = session?.currentRound || 0;
+  const currentRound = session?.currentRound ?? 0;
   const lossData = (session?.metrics ?? []).map((m) => ({ epoch: `R${m.round}`, dpLoss: m.loss }));
 
   const privacyBudget = session?.privacyBudget ?? null;

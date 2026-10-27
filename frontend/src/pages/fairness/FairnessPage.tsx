@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2, ShieldCheck, Scale, CheckCircle2, Download, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +13,6 @@ type Row = FairnessReport['subgroupResults'][number] & { shapP?: number; topFeat
 const pct = (x: number | undefined | null) => (x == null || Number.isNaN(x) ? '—' : `${(x * 100).toFixed(1)}%`);
 
 export default function FairnessPage() {
-  const navigate = useNavigate();
   const [report, setReport] = useState<FairnessReport | null>(null);
   const [loading, setLoading] = useState(true);
 

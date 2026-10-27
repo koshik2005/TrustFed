@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
   Shield, ShieldAlert, Network, BarChart3, ScrollText,
   Settings, LogOut, ChevronRight, Menu, X, ShieldCheck,
-  UserCheck, HeartPulse
+  UserCheck, HeartPulse, Loader2
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/utils';
@@ -13,14 +13,14 @@ import { MOCK_USERS } from '@/services/mockData';
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',  label: 'Hospital Dashboard', path: '/dashboard',  icon: 'LayoutDashboard', roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'training',   label: 'Global Training',    path: '/training',   icon: 'Activity',         roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
   { id: 'prediction', label: 'Patient Prediction', path: '/prediction', icon: 'BrainCircuit',     roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
   { id: 'explain',    label: 'Explainability',      path: '/explain',    icon: 'FlaskConical',     roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'fairness',   label: 'Fairness Audit',      path: '/fairness',   icon: 'ShieldAlert',      roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'privacy',    label: 'Privacy Report',      path: '/privacy',    icon: 'Shield',           roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'regional',   label: 'Regional Hub',        path: '/regional',   icon: 'Network',          roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'comparison', label: 'Model Comparison',    path: '/comparison', icon: 'BarChart3',        roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'audit',      label: 'Audit Log',           path: '/audit',      icon: 'ScrollText',       roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
+  { id: 'regional',   label: 'Regional Hub',        path: '/regional',   icon: 'Network',          roles: ['regional_admin', 'global_admin'] },
+  { id: 'training',   label: 'Global Training',    path: '/training',   icon: 'Activity',         roles: ['regional_admin', 'global_admin'] },
+  { id: 'comparison', label: 'Model Comparison',    path: '/comparison', icon: 'BarChart3',        roles: ['regional_admin', 'global_admin'] },
+  { id: 'fairness',   label: 'Fairness Audit',      path: '/fairness',   icon: 'ShieldAlert',      roles: ['global_admin'] },
+  { id: 'privacy',    label: 'Privacy Report',      path: '/privacy',    icon: 'Shield',           roles: ['global_admin'] },
+  { id: 'audit',      label: 'Audit Log',           path: '/audit',      icon: 'ScrollText',       roles: ['global_admin'] },
   { id: 'settings',   label: 'Settings',            path: '/settings',   icon: 'Settings',         roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
 ];
 
@@ -30,9 +30,13 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
 };
 
 export default function DashboardLayout() {
-  const { user, login, logout } = useAuthStore();
+  const { user, login, logout, isBackendWakingUp } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const allowedNavItems = NAV_ITEMS.filter((item) =>
+    user?.role ? item.roles.includes(user.role) : false
+  );
 
   const handleRoleSwitch = (newRole: UserRole) => {
     const updatedUser = MOCK_USERS[newRole];
@@ -88,7 +92,7 @@ export default function DashboardLayout() {
 
         {/* Nav Items */}
         <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-          {NAV_ITEMS.map((item) => {
+          {allowedNavItems.map((item) => {
             const Icon = ICON_MAP[item.icon];
             return (
               <NavLink
@@ -225,6 +229,17 @@ export default function DashboardLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {isBackendWakingUp && (
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 shadow-xs animate-in fade-in">
+              <span className="flex items-center gap-2 font-medium">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                Connecting to clinical cloud backend: server waking up from standby (Render cold-start)...
+              </span>
+              <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                Auto-retrying
+              </span>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

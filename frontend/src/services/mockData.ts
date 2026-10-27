@@ -1,7 +1,7 @@
 import type {
   TrainingSession, RoundMetric, PredictionResult,
   PatientVitals, FairnessReport, PrivacyReport,
-  AuditEntry, PaginatedResponse, Hospital, User, UserRole,
+  AuditEntry, Hospital, User, UserRole,
   ShapValue
 } from '../types';
 

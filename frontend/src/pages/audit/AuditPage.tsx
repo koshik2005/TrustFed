@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Lock, Download, CheckCircle2, ShieldCheck, Search } from 'lucide-react';
+import { Lock, Download, CheckCircle2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import type { AuditEntry, PaginatedResponse } from '@/types';
@@ -26,20 +26,22 @@ export default function AuditPage() {
   const [selectedEventType, setSelectedEventType] = useState('all');
   const [searchNode, setSearchNode] = useState('');
 
-  const fetchLogs = async (eventType?: string) => {
-    try {
-      const data = await api.auditApi.getLogs({
-        page: 1,
-        eventType: eventType === 'all' ? undefined : eventType,
-      });
-      setLogs(data);
-    } catch (e) {
-      console.error("Failed to fetch logs", e);
-    }
-  };
-
   useEffect(() => {
-    fetchLogs(selectedEventType);
+    let ignore = false;
+    api.auditApi
+      .getLogs({
+        page: 1,
+        eventType: selectedEventType === 'all' ? undefined : selectedEventType,
+      })
+      .then((data) => {
+        if (!ignore) setLogs(data);
+      })
+      .catch((e) => {
+        console.error('Failed to fetch logs', e);
+      });
+    return () => {
+      ignore = true;
+    };
   }, [selectedEventType]);
 
   const handleExportLogs = () => {

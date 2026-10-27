@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BrainCircuit, Timer, ArrowRight, Activity, Loader2 } from 'lucide-react';
+import { BrainCircuit, Timer, ArrowRight, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
 import type { PredictionResult } from '@/types';
 

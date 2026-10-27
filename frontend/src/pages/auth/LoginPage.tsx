@@ -38,14 +38,12 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { token, user } = await api.authApi.login(email, password);
-      login(user, token);
+      const { token, user, csrf_token } = await api.authApi.login(email, password);
+      login(user, token, csrf_token);
       navigate('/dashboard');
-    } catch {
-      // Instant graceful fallback
-      const user = MOCK_USERS[selectedRole];
-      login(user, `tf-token-${selectedRole}`);
-      navigate('/dashboard');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invalid email or password.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -54,7 +52,7 @@ export default function LoginPage() {
   const handleQuickDemoAccess = (role: UserRole) => {
     setSelectedRole(role);
     const user = MOCK_USERS[role];
-    login(user, `tf-token-${role}`);
+    login(user, `tf-token-${role}`, 'mock-demo-csrf');
     navigate('/dashboard');
   };
 

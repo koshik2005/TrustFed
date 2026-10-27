@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Save, Activity, Sparkles, Check, Download, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Save, Activity, Sparkles, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 

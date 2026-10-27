@@ -1,0 +1,15 @@
+# TrustFed AI - Federated Clinical Intelligence
+User-agent: *
+Disallow: /dashboard
+Disallow: /prediction
+Disallow: /explain
+Disallow: /fairness
+Disallow: /privacy
+Disallow: /regional
+Disallow: /comparison
+Disallow: /audit
+Disallow: /settings
+Disallow: /api/
+
+Allow: /
+Allow: /login

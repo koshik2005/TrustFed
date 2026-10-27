@@ -44,7 +44,7 @@ export default function PrivacyPage() {
     { text: "$ Membership-inference attack (loss-threshold, Yeom et al.)", color: "text-emerald-400" },
     { text: "> Members: pooled training records | Non-members: held-out test records", color: "text-emerald-400" },
     { text: `> Reference model (identical run, no DP): attack AUC = ${withoutDPPct !== null ? (withoutDPPct / 100).toFixed(3) : '…'}`, color: "text-amber-400" },
-    { text: `> Protected model (ε = ${report?.epsilon != null ? report.epsilon.toFixed(2) : '∞'}): attack AUC = ${withDPPct !== null ? (withDPPct / 100).toFixed(3) : '…'}`, color: "text-emerald-400" },
+    { text: `> Protected model (ε = ${report?.epsilon != null ? report.epsilon.toFixed(2) : '∞'}): attack AUC = ${withDPPct !== null ? (withDPPct / 100).toFixed(3) : '…'}${leakageReduction ? ` (Risk reduction: -${leakageReduction}%)` : ''}`, color: "text-emerald-400" },
     { text: "> AUC 0.5 = attacker no better than guessing. Small cohorts give noisy AUCs; see the paper for CIs.", color: "text-slate-400" },
   ];
 

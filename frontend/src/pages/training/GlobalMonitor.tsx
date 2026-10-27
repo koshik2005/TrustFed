@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Cloud, Network, CheckCircle2, RefreshCw, Loader2 } from 'lucide-react';
@@ -8,31 +8,33 @@ import { motion } from 'framer-motion';
 import { api } from '@/services/api';
 import type { TrainingSession } from '@/types';
 
-
-
 export default function GlobalMonitor() {
   const [session, setSession] = useState<TrainingSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState('');
 
-  // Fetch session status on mount
-  const fetchStatus = async () => {
-    try {
-      const data = await api.trainingApi.getLatestSession();
-      setSession(data);
-    } catch (error) {
-      console.error("Failed to load session status");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchStatus();
-    // Poll every 3 seconds for responsive training telemetry
-    const interval = setInterval(fetchStatus, 3000);
-    return () => clearInterval(interval);
+    let ignore = false;
+    const update = async () => {
+      try {
+        const data = await api.trainingApi.getLatestSession();
+        if (!ignore) {
+          setSession(data);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load session status', err);
+        if (!ignore) setIsLoading(false);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 3000);
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const handleStartSession = async () => {
@@ -40,8 +42,8 @@ export default function GlobalMonitor() {
     setStartError('');
     try {
       const saved = JSON.parse(localStorage.getItem('tf_settings') ?? '{}');
-      await api.trainingApi.startSession({ rounds: 20, ...saved });
-      await fetchStatus(); // Refresh immediately after starting
+      const updated = await api.trainingApi.startSession({ rounds: 20, ...saved });
+      setSession(updated);
     } catch (e: any) {
       setStartError(e?.response?.data?.detail ?? 'Could not start a session');
     } finally {
@@ -58,6 +60,14 @@ export default function GlobalMonitor() {
     loss: m.loss,
   }));
   const sparklineData = (session?.metrics ?? []).map((m) => Math.round(m.accuracy * 100));
+
+  if (isLoading && !session) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <motion.div 

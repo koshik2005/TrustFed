@@ -1,12 +1,16 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import DashboardLayout from '@/layouts/DashboardLayout';
+import RoleRoute from '@/components/common/RoleRoute';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 
-// Pages (will be created as you provide HTML designs)
+// Public & Error Pages
 import LoginPage from '@/pages/auth/LoginPage';
+import Forbidden403 from '@/pages/error/Forbidden403';
+import NotFound404 from '@/pages/error/NotFound404';
 
-// Lazy-loaded pages — add as you build each one
-import { lazy, Suspense } from 'react';
+// Lazy-loaded pages
 const HospitalDashboard  = lazy(() => import('@/pages/dashboard/HospitalDashboard'));
 const GlobalMonitor      = lazy(() => import('@/pages/training/GlobalMonitor'));
 const PredictionPage     = lazy(() => import('@/pages/prediction/PredictionPage'));
@@ -32,36 +36,123 @@ function LoadingFallback() {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Attempt silent session restore on startup via httpOnly refresh token cookie
+    useAuthStore.getState().initializeAuth();
+  }, []);
+
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/403" element={<Forbidden403 />} />
+          <Route path="/404" element={<NotFound404 />} />
 
-        {/* Protected — all inside DashboardLayout */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"   element={<HospitalDashboard />} />
-          <Route path="training"    element={<GlobalMonitor />} />
-          <Route path="prediction"  element={<PredictionPage />} />
-          <Route path="explain"     element={<ExplainPage />} />
-          <Route path="fairness"    element={<FairnessPage />} />
-          <Route path="privacy"     element={<PrivacyPage />} />
-          <Route path="regional"    element={<RegionalPage />} />
-          <Route path="comparison"  element={<ComparisonPage />} />
-          <Route path="audit"       element={<AuditPage />} />
-          <Route path="settings"    element={<SettingsPage />} />
-        </Route>
+          {/* Protected — all inside DashboardLayout */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Hospital & Above */}
+            <Route
+              path="dashboard"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                  <HospitalDashboard />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="prediction"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                  <PredictionPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="explain"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                  <ExplainPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                  <SettingsPage />
+                </RoleRoute>
+              }
+            />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+            {/* Regional & Global Admins */}
+            <Route
+              path="regional"
+              element={
+                <RoleRoute allowedRoles={['regional_admin', 'global_admin']}>
+                  <RegionalPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="training"
+              element={
+                <RoleRoute allowedRoles={['regional_admin', 'global_admin']}>
+                  <GlobalMonitor />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="comparison"
+              element={
+                <RoleRoute allowedRoles={['regional_admin', 'global_admin']}>
+                  <ComparisonPage />
+                </RoleRoute>
+              }
+            />
+
+            {/* Global Admins Only */}
+            <Route
+              path="fairness"
+              element={
+                <RoleRoute allowedRoles={['global_admin']}>
+                  <FairnessPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="privacy"
+              element={
+                <RoleRoute allowedRoles={['global_admin']}>
+                  <PrivacyPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="audit"
+              element={
+                <RoleRoute allowedRoles={['global_admin']}>
+                  <AuditPage />
+                </RoleRoute>
+              }
+            />
+          </Route>
+
+          {/* Catch-all */}
+          <Route path="*" element={<NotFound404 />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
+

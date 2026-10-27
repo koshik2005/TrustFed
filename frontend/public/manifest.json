@@ -1,0 +1,16 @@
+{
+  "short_name": "TrustFed",
+  "name": "TrustFed AI - Federated Clinical Intelligence",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "portrait"
+}
