@@ -18,9 +18,11 @@ const ExplainPage        = lazy(() => import('@/pages/explainability/ExplainPage
 const FairnessPage       = lazy(() => import('@/pages/fairness/FairnessPage'));
 const PrivacyPage        = lazy(() => import('@/pages/privacy/PrivacyPage'));
 const RegionalPage       = lazy(() => import('@/pages/regional/RegionalPage'));
+const RegionalHubsPage   = lazy(() => import('@/pages/admin/RegionalHubsPage'));
 const ComparisonPage     = lazy(() => import('@/pages/comparison/ComparisonPage'));
 const AuditPage          = lazy(() => import('@/pages/audit/AuditPage'));
 const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
+import ForcePasswordResetModal from '@/components/auth/ForcePasswordResetModal';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -65,7 +67,7 @@ export default function App() {
             <Route
               path="dashboard"
               element={
-                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'regional_admin', 'global_admin']}>
                   <HospitalDashboard />
                 </RoleRoute>
               }
@@ -73,7 +75,7 @@ export default function App() {
             <Route
               path="prediction"
               element={
-                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'regional_admin', 'global_admin']}>
                   <PredictionPage />
                 </RoleRoute>
               }
@@ -81,7 +83,7 @@ export default function App() {
             <Route
               path="explain"
               element={
-                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'regional_admin', 'global_admin']}>
                   <ExplainPage />
                 </RoleRoute>
               }
@@ -89,7 +91,7 @@ export default function App() {
             <Route
               path="settings"
               element={
-                <RoleRoute allowedRoles={['hospital_staff', 'regional_admin', 'global_admin']}>
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'regional_admin', 'global_admin']}>
                   <SettingsPage />
                 </RoleRoute>
               }
@@ -123,6 +125,14 @@ export default function App() {
 
             {/* Global Admins Only */}
             <Route
+              path="hubs"
+              element={
+                <RoleRoute allowedRoles={['global_admin']}>
+                  <RegionalHubsPage />
+                </RoleRoute>
+              }
+            />
+            <Route
               path="fairness"
               element={
                 <RoleRoute allowedRoles={['global_admin']}>
@@ -151,6 +161,7 @@ export default function App() {
           {/* Catch-all */}
           <Route path="*" element={<NotFound404 />} />
         </Routes>
+        <ForcePasswordResetModal />
       </Suspense>
     </ErrorBoundary>
   );

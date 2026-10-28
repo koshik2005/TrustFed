@@ -84,7 +84,41 @@ def decode_token(tok: str, expected_type: Optional[str] = "access") -> Dict[str,
         raise ValueError(f"invalid token: {e}")
 
 
-def create_refresh_token_pair(user_id: int, email: str, role: str, hospital_id: Optional[str]) -> Dict[str, str]:
+def validate_password_strength(password: str) -> None:
+    """Enforces high-security enterprise password requirements."""
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+    if not any(c.isupper() for c in password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not any(c.islower() for c in password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not any(c.isdigit() for c in password):
+        raise ValueError("Password must contain at least one number")
+    specials = "!@#$%^&*()-_=+[]{}|;:,.<>?"
+    if not any(c in specials for c in password):
+        raise ValueError("Password must contain at least one special character")
+
+
+def generate_temp_password(length: int = 14) -> str:
+    """Generate a high-entropy one-time temporary password meeting all policy criteria."""
+    import string
+    specials = "!@#$%^&*()-_=+"
+    p = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(specials),
+    ]
+    all_chars = string.ascii_letters + string.digits + specials
+    for _ in range(max(0, length - 4)):
+        p.append(secrets.choice(all_chars))
+    secrets.SystemRandom().shuffle(p)
+    return "".join(p)
+
+
+def create_refresh_token_pair(
+    user_id: int, email: str, role: str, hospital_id: Optional[str], hub_id: Optional[str] = None
+) -> Dict[str, str]:
     """Create short-lived access token + long-lived refresh token with unique JTI and CSRF token."""
     csrf_token = secrets.token_hex(32)
     jti = secrets.token_hex(16)
@@ -92,6 +126,7 @@ def create_refresh_token_pair(user_id: int, email: str, role: str, hospital_id: 
         "sub": email,
         "role": role,
         "hospital_id": hospital_id,
+        "hub_id": hub_id,
         "user_id": user_id,
     }, ttl=15 * 60, token_type="access")
 
@@ -100,6 +135,7 @@ def create_refresh_token_pair(user_id: int, email: str, role: str, hospital_id: 
         "user_id": user_id,
         "role": role,
         "hospital_id": hospital_id,
+        "hub_id": hub_id,
         "jti": jti,
         "csrf": csrf_token,
     }, ttl=7 * 86400, token_type="refresh")

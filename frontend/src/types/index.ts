@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-export type UserRole = 'hospital_staff' | 'regional_admin' | 'global_admin';
+export type UserRole = 'hospital_staff' | 'doctor' | 'regional_admin' | 'global_admin';
 
 export interface User {
   id: string;
@@ -12,7 +12,32 @@ export interface User {
   email: string;
   role: UserRole;
   hospitalId?: string;
+  hubId?: string;
+  mustResetPassword?: boolean;
+  status?: string;
   avatarUrl?: string;
+}
+
+export interface RegionalHub {
+  id: string;
+  name: string;
+  region: string;
+  status: 'active' | 'suspended' | string;
+  createdBy?: number;
+  hospitalCount: number;
+  adminCount: number;
+  createdAt: string;
+}
+
+export interface RegionalHospital {
+  id: string;
+  name: string;
+  hubId: string;
+  status: 'active' | 'suspended' | 'removed' | string;
+  shareDeidentified: boolean;
+  userCount: number;
+  datasetSize: number;
+  nodeStatus: string;
 }
 
 export interface AuthState {

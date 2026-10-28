@@ -13,6 +13,7 @@ import { api } from '@/services/api';
 
 const DEMO_EMAIL: Record<UserRole, string> = {
   hospital_staff: 'hospital@trustfed.ai',
+  doctor: 'doctor@trustfed.ai',
   regional_admin: 'regional@trustfed.ai',
   global_admin: 'admin@trustfed.ai',
 };

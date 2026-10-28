@@ -4,44 +4,39 @@ import {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
   Shield, ShieldAlert, Network, BarChart3, ScrollText,
   Settings, LogOut, ChevronRight, Menu, X, ShieldCheck,
-  UserCheck, HeartPulse, Loader2
+  UserCheck, HeartPulse, Loader2, Hospital
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/utils';
-import type { NavItem, UserRole } from '@/types';
-import { MOCK_USERS } from '@/services/mockData';
+import type { NavItem } from '@/types';
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',  label: 'Hospital Dashboard', path: '/dashboard',  icon: 'LayoutDashboard', roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'prediction', label: 'Patient Prediction', path: '/prediction', icon: 'BrainCircuit',     roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'explain',    label: 'Explainability',      path: '/explain',    icon: 'FlaskConical',     roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
-  { id: 'regional',   label: 'Regional Hub',        path: '/regional',   icon: 'Network',          roles: ['regional_admin', 'global_admin'] },
-  { id: 'training',   label: 'Global Training',    path: '/training',   icon: 'Activity',         roles: ['regional_admin', 'global_admin'] },
+  { id: 'dashboard',  label: 'Hospital Dashboard', path: '/dashboard',  icon: 'LayoutDashboard', roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'prediction', label: 'Patient Prediction', path: '/prediction', icon: 'BrainCircuit',     roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'explain',    label: 'Explainability',      path: '/explain',    icon: 'FlaskConical',     roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'hubs',       label: 'Regional Hubs',       path: '/hubs',       icon: 'Network',          roles: ['global_admin'] },
+  { id: 'regional',   label: 'Regional Hospitals',  path: '/regional',   icon: 'Hospital',         roles: ['regional_admin', 'global_admin'] },
+  { id: 'training',   label: 'Global Training',     path: '/training',   icon: 'Activity',         roles: ['regional_admin', 'global_admin'] },
   { id: 'comparison', label: 'Model Comparison',    path: '/comparison', icon: 'BarChart3',        roles: ['regional_admin', 'global_admin'] },
   { id: 'fairness',   label: 'Fairness Audit',      path: '/fairness',   icon: 'ShieldAlert',      roles: ['global_admin'] },
   { id: 'privacy',    label: 'Privacy Report',      path: '/privacy',    icon: 'Shield',           roles: ['global_admin'] },
   { id: 'audit',      label: 'Audit Log',           path: '/audit',      icon: 'ScrollText',       roles: ['global_admin'] },
-  { id: 'settings',   label: 'Settings',            path: '/settings',   icon: 'Settings',         roles: ['hospital_staff', 'regional_admin', 'global_admin'] },
+  { id: 'settings',   label: 'Settings',            path: '/settings',   icon: 'Settings',         roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
 ];
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
-  Shield, ShieldAlert, Network, BarChart3, ScrollText, Settings,
+  Shield, ShieldAlert, Network, BarChart3, ScrollText, Settings, Hospital,
 };
 
 export default function DashboardLayout() {
-  const { user, login, logout, isBackendWakingUp } = useAuthStore();
+  const { user, logout, isBackendWakingUp } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const allowedNavItems = NAV_ITEMS.filter((item) =>
     user?.role ? item.roles.includes(user.role) : false
   );
-
-  const handleRoleSwitch = (newRole: UserRole) => {
-    const updatedUser = MOCK_USERS[newRole];
-    login(updatedUser, `tf-token-${newRole}`);
-  };
 
   const handleLogout = () => {
     logout();
@@ -183,41 +178,23 @@ export default function DashboardLayout() {
             </div>
           </div>
 
-          {/* Quick Role Switcher for instant testing */}
+          {/* Current Authenticated Role Badge */}
           <div className="flex items-center gap-2.5">
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-600">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-xs">
               <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-[11px] font-medium text-slate-500">Switch Role:</span>
-              <button
-                type="button"
-                onClick={() => handleRoleSwitch('hospital_staff')}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
-                  user?.role === 'hospital_staff' ? "bg-white text-blue-700 shadow-xs font-semibold" : "hover:text-slate-900"
-                )}
-              >
-                Hospital Staff
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleSwitch('regional_admin')}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
-                  user?.role === 'regional_admin' ? "bg-white text-blue-700 shadow-xs font-semibold" : "hover:text-slate-900"
-                )}
-              >
-                Regional Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleSwitch('global_admin')}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
-                  user?.role === 'global_admin' ? "bg-white text-blue-700 shadow-xs font-semibold" : "hover:text-slate-900"
-                )}
-              >
-                Global Admin
-              </button>
+              <span className="font-semibold text-slate-800 capitalize">
+                {user?.role ? user.role.replace('_', ' ') : 'Guest'}
+              </span>
+              {user?.hospitalId && (
+                <span className="text-slate-500 font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  {user.hospitalId}
+                </span>
+              )}
+              {user?.hubId && !user?.hospitalId && (
+                <span className="text-slate-500 font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  {user.hubId}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">

@@ -9,10 +9,12 @@ from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+import numpy as np
 from db.database import get_db
 from db import models
 from services import auth, inference, store
 from services.explanation import generate_clinical_explanation
+from tefl import nn
 
 router = APIRouter()
 
@@ -51,18 +53,49 @@ def current_user(authorization: Optional[str] = Header(None), db: Session = Depe
     u = db.query(models.User).filter_by(email=claims.get("sub")).first()
     if not u:
         raise HTTPException(401, "Unknown user")
+
+    # Immediate revocation check: user status
+    if u.status and u.status != "active":
+        raise HTTPException(401, "User account is suspended or inactive")
+
+    # Immediate revocation check: hospital status
+    if u.hospital_id:
+        hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
+        if hosp and hosp.status != "active":
+            raise HTTPException(401, f"Hospital '{hosp.name}' is currently {hosp.status}")
+
+    # Immediate revocation check: regional hub status
+    hub_id = u.hub_id
+    if not hub_id and u.hospital_id:
+        hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
+        if hosp:
+            hub_id = hosp.hub_id
+    if hub_id:
+        hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+        if hub and hub.status != "active":
+            raise HTTPException(401, f"Regional hub '{hub.name}' is currently {hub.status}")
+
+    return u
+
+
+def active_user(u: models.User = Depends(current_user)) -> models.User:
+    """Enforces that first-login password reset has been completed."""
+    if u.must_reset_password:
+        raise HTTPException(403, "Password reset required on first login")
     return u
 
 
 def require(*roles: str):
     def dep(u: models.User = Depends(current_user)):
+        if u.must_reset_password:
+            raise HTTPException(403, "Password reset required on first login")
         if u.role not in roles:
             raise HTTPException(403, f"Role '{u.role}' may not access this resource")
         return u
     return dep
 
 
-ANY = ("hospital_staff", "regional_admin", "global_admin")
+ANY = ("hospital_staff", "doctor", "regional_admin", "global_admin")
 ADMINS = ("regional_admin", "global_admin")
 
 
@@ -71,8 +104,22 @@ class LoginBody(BaseModel):
     password: str
 
 
+class ResetPasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
 def _user_json(u: models.User) -> Dict[str, Any]:
-    return {"id": str(u.id), "name": u.name, "email": u.email, "role": u.role, "hospitalId": u.hospital_id}
+    return {
+        "id": str(u.id),
+        "name": u.name,
+        "email": u.email,
+        "role": u.role,
+        "hospitalId": u.hospital_id,
+        "hubId": u.hub_id,
+        "mustResetPassword": bool(u.must_reset_password),
+        "status": u.status or "active"
+    }
 
 
 def _cookie_samesite(request: Request) -> str:
@@ -85,6 +132,53 @@ def _cookie_samesite(request: Request) -> str:
     return "lax"
 
 
+def revoke_user_tokens(db: Session, user_id: int):
+    """Revokes all active refresh tokens for a user immediately."""
+    db.query(models.RefreshToken).filter_by(user_id=user_id, revoked=False).update(
+        {models.RefreshToken.revoked: True}, synchronize_session=False
+    )
+    db.commit()
+
+
+def cascade_hospital_suspension(db: Session, hospital_id: str, action: str = "suspend"):
+    """Revokes tokens and sets hospital users and training node offline."""
+    users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
+    for usr in users:
+        usr.status = "suspended" if action == "suspend" else "removed"
+        revoke_user_tokens(db, usr.id)
+    node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
+    if node:
+        node.status = "offline"
+    db.commit()
+
+
+def reactivate_hospital_cascade(db: Session, hospital_id: str):
+    """Reactivates hospital and training node."""
+    h = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if h:
+        h.status = "active"
+    users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
+    for usr in users:
+        usr.status = "active"
+    node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
+    if node:
+        node.status = "idle"
+    db.commit()
+
+
+def cascade_hub_suspension(db: Session, hub_id: str, action: str = "suspend"):
+    """Suspends regional admins and all dependent hospitals in the hub."""
+    admins = db.query(models.User).filter_by(hub_id=hub_id).all()
+    for a in admins:
+        a.status = "suspended" if action == "suspend" else "removed"
+        revoke_user_tokens(db, a.id)
+    hospitals = db.query(models.Hospital).filter_by(hub_id=hub_id).all()
+    for h in hospitals:
+        h.status = "suspended" if action == "suspend" else "removed"
+        cascade_hospital_suspension(db, h.id, action=action)
+    db.commit()
+
+
 @router.post("/auth/login")
 @limiter.limit("5/minute")
 def login(request: Request, body: LoginBody, response: Response, db: Session = Depends(get_db)):
@@ -94,9 +188,28 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
         store.add_audit(db, None, client_ip, "auth", f"Failed login attempt for {body.email[:60]}")
         raise HTTPException(401, "Invalid email or password")
 
+    if u.status and u.status != "active":
+        store.add_audit(db, None, u.email, "auth", f"Login rejected: user account is {u.status}")
+        raise HTTPException(401, "User account is suspended or inactive")
+
+    if u.hospital_id:
+        hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
+        if hosp and hosp.status != "active":
+            raise HTTPException(401, f"Hospital '{hosp.name}' is currently {hosp.status}")
+
+    hub_id = u.hub_id
+    if not hub_id and u.hospital_id:
+        hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
+        if hosp:
+            hub_id = hosp.hub_id
+    if hub_id:
+        hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+        if hub and hub.status != "active":
+            raise HTTPException(401, f"Regional hub '{hub.name}' is currently {hub.status}")
+
     # Issue short-lived access token + long-lived rotating refresh token + CSRF token
     tokens = auth.create_refresh_token_pair(
-        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id
+        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id, hub_id=u.hub_id
     )
 
     # Persist refresh token in database for rotation & revocation tracking
@@ -110,7 +223,7 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
     db.add(rf)
     db.commit()
 
-    # Deliver refresh token via httpOnly, Secure cookie (SameSite=lax for first-party Vercel rewrite, none for cross-site)
+    # Deliver refresh token via httpOnly, Secure cookie
     response.set_cookie(
         key="tf_refresh_token",
         value=tokens["refresh_token"],
@@ -164,9 +277,23 @@ def refresh_session(
     if not u:
         raise HTTPException(401, "User record not found")
 
+    if u.status and u.status != "active":
+        raise HTTPException(401, "User account is suspended or inactive")
+
+    if u.hospital_id:
+        hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
+        if hosp and hosp.status != "active":
+            raise HTTPException(401, f"Hospital '{hosp.name}' is currently {hosp.status}")
+
+    hub_id = u.hub_id or (hosp.hub_id if u.hospital_id and hosp else None)
+    if hub_id:
+        hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+        if hub and hub.status != "active":
+            raise HTTPException(401, f"Regional hub '{hub.name}' is currently {hub.status}")
+
     # Issue new rotated token pair
     tokens = auth.create_refresh_token_pair(
-        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id
+        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id, hub_id=u.hub_id
     )
     exp_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
     new_rf = models.RefreshToken(
@@ -192,6 +319,28 @@ def refresh_session(
         "csrf_token": tokens["csrf_token"],
         "user": _user_json(u)
     }
+
+
+@router.post("/auth/reset-password")
+def reset_password(
+    body: ResetPasswordBody,
+    db: Session = Depends(get_db),
+    u: models.User = Depends(current_user)
+):
+    if not auth.verify_password(body.current_password, u.password_hash):
+        raise HTTPException(400, "Current password is incorrect")
+    if body.current_password == body.new_password:
+        raise HTTPException(400, "New password cannot be identical to current temporary password")
+    try:
+        auth.validate_password_strength(body.new_password)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+    u.password_hash = auth.hash_password(body.new_password)
+    u.must_reset_password = False
+    db.commit()
+    store.add_audit(db, None, u.email, "auth", f"Password reset completed for user {u.email}")
+    return {"message": "Password reset successfully", "user": _user_json(u)}
 
 
 @router.post("/auth/logout")
@@ -224,6 +373,368 @@ def me(u: models.User = Depends(current_user)):
     return _user_json(u)
 
 
+# ── Hierarchy Models & Pydantic Schemas ────────────────────────────────────────
+
+class CreateHubBody(BaseModel):
+    id: str
+    name: str
+    region: str
+
+
+class UpdateHubBody(BaseModel):
+    name: Optional[str] = None
+    region: Optional[str] = None
+
+
+class IssueAdminBody(BaseModel):
+    name: str
+    email: str
+
+
+class CreateHospitalBody(BaseModel):
+    id: str
+    name: str
+    hub_id: Optional[str] = None
+    share_deidentified: bool = False
+
+
+class UpdateHospitalBody(BaseModel):
+    name: Optional[str] = None
+    share_deidentified: Optional[bool] = None
+
+
+class IssueHospitalUserBody(BaseModel):
+    name: str
+    email: str
+    role: str  # "hospital_staff" or "doctor"
+
+
+# ── Regional Hubs Management (Global Admin Only) ───────────────────────────
+
+@router.get("/admin/hubs")
+def list_hubs(db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hubs = db.query(models.RegionalHub).order_by(models.RegionalHub.id).all()
+    res = []
+    for h in hubs:
+        hosp_count = db.query(models.Hospital).filter_by(hub_id=h.id).count()
+        admin_count = db.query(models.User).filter_by(hub_id=h.id, role="regional_admin").count()
+        res.append({
+            "id": h.id,
+            "name": h.name,
+            "region": h.region,
+            "status": h.status,
+            "createdBy": h.created_by,
+            "hospitalCount": hosp_count,
+            "adminCount": admin_count,
+            "createdAt": str(h.created_at)
+        })
+    return res
+
+
+@router.post("/admin/hubs")
+def create_hub(body: CreateHubBody, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    existing = db.query(models.RegionalHub).filter_by(id=body.id.strip()).first()
+    if existing:
+        raise HTTPException(409, f"Regional Hub '{body.id}' already exists")
+    hub = models.RegionalHub(
+        id=body.id.strip(),
+        name=body.name.strip(),
+        region=body.region.strip(),
+        status="active",
+        created_by=u.id
+    )
+    db.add(hub)
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Created regional hub '{hub.id}' ({hub.name})")
+    return {"message": "Regional Hub created successfully", "hub": {"id": hub.id, "name": hub.name, "region": hub.region, "status": hub.status}}
+
+
+@router.put("/admin/hubs/{hub_id}")
+def update_hub(hub_id: str, body: UpdateHubBody, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    if body.name:
+        hub.name = body.name.strip()
+    if body.region:
+        hub.region = body.region.strip()
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Updated regional hub '{hub_id}' ({hub.name})")
+    return {"message": "Regional Hub updated successfully", "hub": {"id": hub.id, "name": hub.name, "region": hub.region, "status": hub.status}}
+
+
+@router.post("/admin/hubs/{hub_id}/suspend")
+def suspend_hub(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    hub.status = "suspended"
+    cascade_hub_suspension(db, hub_id, action="suspend")
+    store.add_audit(db, None, u.email, "admin", f"Suspended regional hub '{hub_id}' and revoked tokens")
+    return {"message": f"Regional Hub '{hub_id}' suspended and all dependent access revoked"}
+
+
+@router.post("/admin/hubs/{hub_id}/reactivate")
+def reactivate_hub(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    hub.status = "active"
+    for a in db.query(models.User).filter_by(hub_id=hub_id).all():
+        a.status = "active"
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Reactivated regional hub '{hub_id}'")
+    return {"message": f"Regional Hub '{hub_id}' reactivated"}
+
+
+@router.delete("/admin/hubs/{hub_id}")
+def delete_hub(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    cascade_hub_suspension(db, hub_id, action="delete")
+    db.delete(hub)
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Deleted regional hub '{hub_id}'")
+    return {"message": f"Regional Hub '{hub_id}' deleted successfully"}
+
+
+@router.post("/admin/hubs/{hub_id}/admins")
+def issue_hub_admin(hub_id: str, body: IssueAdminBody, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    if hub.status != "active":
+        raise HTTPException(400, "Cannot issue credentials for a suspended hub")
+    existing = db.query(models.User).filter_by(email=body.email.strip().lower()).first()
+    if existing:
+        raise HTTPException(409, f"User with email '{body.email}' already exists")
+    temp_pw = auth.generate_temp_password(14)
+    new_user = models.User(
+        email=body.email.strip().lower(),
+        name=body.name.strip(),
+        role="regional_admin",
+        hub_id=hub_id,
+        hospital_id=None,
+        must_reset_password=True,
+        status="active",
+        password_hash=auth.hash_password(temp_pw)
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    store.add_audit(db, None, u.email, "admin", f"Issued regional_admin credentials for {new_user.email} in hub {hub_id}")
+    return {"user": _user_json(new_user), "temp_password": temp_pw}
+
+
+@router.get("/admin/hubs/{hub_id}/admins")
+def list_hub_admins(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    admins = db.query(models.User).filter_by(hub_id=hub_id, role="regional_admin").all()
+    return [_user_json(a) for a in admins]
+
+
+# ── Hospital Management (Regional Admin scoped to their hub, Global Admin supervisor) ──────────
+
+@router.get("/regional/hospitals")
+def list_regional_hospitals(db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    q = db.query(models.Hospital)
+    if u.role == "regional_admin":
+        if not u.hub_id:
+            return []
+        q = q.filter(models.Hospital.hub_id == u.hub_id)
+    hospitals = q.order_by(models.Hospital.id).all()
+    res = []
+    for h in hospitals:
+        user_count = db.query(models.User).filter_by(hospital_id=h.id).count()
+        node = db.query(models.HospitalNode).filter_by(id=h.id).first()
+        res.append({
+            "id": h.id,
+            "name": h.name,
+            "hubId": h.hub_id,
+            "status": h.status,
+            "shareDeidentified": bool(h.share_deidentified),
+            "userCount": user_count,
+            "datasetSize": node.dataset_size if node else 0,
+            "nodeStatus": node.status if node else "offline"
+        })
+    return res
+
+
+@router.post("/regional/hospitals")
+def create_hospital(body: CreateHospitalBody, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    target_hub_id = u.hub_id if u.role == "regional_admin" else (body.hub_id or u.hub_id)
+    if u.role == "regional_admin" and body.hub_id and body.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin can only create hospitals in their own assigned hub")
+    if not target_hub_id:
+        raise HTTPException(400, "hub_id is required")
+    hub = db.query(models.RegionalHub).filter_by(id=target_hub_id).first()
+    if not hub:
+        raise HTTPException(404, f"Regional Hub '{target_hub_id}' not found")
+    if hub.status != "active":
+        raise HTTPException(400, "Cannot add hospital to a suspended hub")
+    existing = db.query(models.Hospital).filter_by(id=body.id.strip()).first()
+    if existing:
+        raise HTTPException(409, f"Hospital '{body.id}' already exists")
+
+    hosp = models.Hospital(
+        id=body.id.strip(),
+        name=body.name.strip(),
+        hub_id=target_hub_id,
+        status="active",
+        share_deidentified=body.share_deidentified
+    )
+    db.add(hosp)
+    node = db.query(models.HospitalNode).filter_by(id=hosp.id).first()
+    if not node:
+        db.add(models.HospitalNode(id=hosp.id, name=hosp.name, region=hub.region, status="idle", dataset_size=50))
+    else:
+        node.status = "idle"
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Created hospital '{hosp.id}' ({hosp.name}) in hub {target_hub_id}")
+    return {"message": "Hospital created successfully", "hospital": {"id": hosp.id, "name": hosp.name, "hubId": hosp.hub_id, "status": hosp.status}}
+
+
+@router.put("/regional/hospitals/{hospital_id}")
+def update_hospital(hospital_id: str, body: UpdateHospitalBody, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot edit hospitals outside their assigned hub")
+    if body.name is not None:
+        hosp.name = body.name.strip()
+        node = db.query(models.HospitalNode).filter_by(id=hosp.id).first()
+        if node:
+            node.name = hosp.name
+    if body.share_deidentified is not None:
+        hosp.share_deidentified = body.share_deidentified
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Updated hospital '{hospital_id}' ({hosp.name})")
+    return {"message": "Hospital updated successfully", "hospital": {"id": hosp.id, "name": hosp.name, "hubId": hosp.hub_id, "status": hosp.status}}
+
+
+@router.post("/regional/hospitals/{hospital_id}/suspend")
+def suspend_hospital(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot suspend hospitals outside their assigned hub")
+    hosp.status = "suspended"
+    cascade_hospital_suspension(db, hospital_id, action="suspend")
+    store.add_audit(db, None, u.email, "admin", f"Suspended hospital '{hospital_id}' and revoked user tokens")
+    return {"message": f"Hospital '{hospital_id}' suspended and excluded from training"}
+
+
+@router.post("/regional/hospitals/{hospital_id}/reactivate")
+def reactivate_hospital(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot reactivate hospitals outside their assigned hub")
+    reactivate_hospital_cascade(db, hospital_id)
+    store.add_audit(db, None, u.email, "admin", f"Reactivated hospital '{hospital_id}'")
+    return {"message": f"Hospital '{hospital_id}' reactivated"}
+
+
+@router.delete("/regional/hospitals/{hospital_id}")
+def delete_hospital(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot delete hospitals outside their assigned hub")
+    cascade_hospital_suspension(db, hospital_id, action="remove")
+    db.delete(hosp)
+    node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
+    if node:
+        db.delete(node)
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Removed hospital '{hospital_id}'")
+    return {"message": f"Hospital '{hospital_id}' removed successfully"}
+
+
+@router.post("/regional/hospitals/{hospital_id}/users")
+def issue_hospital_user(hospital_id: str, body: IssueHospitalUserBody, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot issue credentials for hospitals outside their assigned hub")
+    if hosp.status != "active":
+        raise HTTPException(400, "Cannot issue credentials for a suspended hospital")
+    if body.role not in ("hospital_staff", "doctor"):
+        raise HTTPException(400, "Hospital user role must be 'hospital_staff' or 'doctor'")
+    existing = db.query(models.User).filter_by(email=body.email.strip().lower()).first()
+    if existing:
+        raise HTTPException(409, f"User with email '{body.email}' already exists")
+    temp_pw = auth.generate_temp_password(14)
+    new_user = models.User(
+        email=body.email.strip().lower(),
+        name=body.name.strip(),
+        role=body.role,
+        hospital_id=hospital_id,
+        hub_id=hosp.hub_id,
+        must_reset_password=True,
+        status="active",
+        password_hash=auth.hash_password(temp_pw)
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    store.add_audit(db, None, u.email, "admin", f"Issued {body.role} credentials for {new_user.email} in hospital {hospital_id}")
+    return {"user": _user_json(new_user), "temp_password": temp_pw}
+
+
+@router.get("/regional/hospitals/{hospital_id}/users")
+def list_hospital_users(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Access forbidden to hospital users outside your hub")
+    users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
+    return [_user_json(usr) for usr in users]
+
+
+@router.post("/regional/users/{user_id}/suspend")
+def suspend_user(user_id: int, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    target = db.query(models.User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if u.role == "regional_admin":
+        if not target.hospital_id:
+            raise HTTPException(403, "Regional admin can only manage hospital users")
+        hosp = db.query(models.Hospital).filter_by(id=target.hospital_id).first()
+        if not hosp or hosp.hub_id != u.hub_id:
+            raise HTTPException(403, "Regional admin cannot suspend users outside their hub")
+    target.status = "suspended"
+    revoke_user_tokens(db, target.id)
+    store.add_audit(db, None, u.email, "admin", f"Suspended user {target.email} ({target.role}) and revoked tokens")
+    return {"message": f"User '{target.email}' suspended successfully"}
+
+
+@router.delete("/regional/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    target = db.query(models.User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if u.role == "regional_admin":
+        if not target.hospital_id:
+            raise HTTPException(403, "Regional admin can only manage hospital users")
+        hosp = db.query(models.Hospital).filter_by(id=target.hospital_id).first()
+        if not hosp or hosp.hub_id != u.hub_id:
+            raise HTTPException(403, "Regional admin cannot delete users outside their hub")
+    revoke_user_tokens(db, target.id)
+    email = target.email
+    role = target.role
+    db.delete(target)
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Deleted user {email} ({role}) and revoked tokens")
+    return {"message": f"User '{email}' deleted successfully"}
+
+
 # ── Training ────────────────────────────────────────────────────────────────
 def _session_json(db: Session, s: models.FLSession):
     metrics = db.query(models.RoundMetric).filter_by(session_id=s.session_id).order_by(models.RoundMetric.round).all()
@@ -246,7 +757,7 @@ def _hosp_json(n: models.HospitalNode):
 
 
 @router.get("/training/sessions/latest")
-def latest_session(db: Session = Depends(get_db), u: models.User = Depends(current_user)):
+def latest_session(db: Session = Depends(get_db), u: models.User = Depends(active_user)):
     s = db.query(models.FLSession).order_by(models.FLSession.id.desc()).first()
     if not s:
         return {
@@ -283,10 +794,10 @@ def start_training(config: Dict[str, Any], db: Session = Depends(get_db), u=Depe
 
 
 @router.get("/training/hospitals")
-def hospitals(db: Session = Depends(get_db), u: models.User = Depends(current_user)):
+def hospitals(db: Session = Depends(get_db), u: models.User = Depends(active_user)):
     q = db.query(models.HospitalNode).order_by(models.HospitalNode.id)
-    if u.role == "hospital_staff":
-        # Object-level authorization: Hospital staff only inspects their own hospital node
+    if u.role in ("hospital_staff", "doctor"):
+        # Object-level authorization: Hospital staff/doctor only inspects their own hospital node
         if u.hospital_id:
             q = q.filter(models.HospitalNode.id == u.hospital_id)
         else:
@@ -392,7 +903,7 @@ def _pred_json(p: models.PatientPrediction):
 
 
 @router.post("/prediction/predict")
-def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.User = Depends(current_user)):
+def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.User = Depends(active_user)):
     s, model, is_fallback = _active_model(db)
     try:
         r = inference.predict(model, vitals)
@@ -429,10 +940,10 @@ def history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    u: models.User = Depends(current_user)
+    u: models.User = Depends(active_user)
 ):
     q = db.query(models.PatientPrediction).order_by(models.PatientPrediction.id.desc())
-    if u.role == "hospital_staff":
+    if u.role in ("hospital_staff", "doctor"):
         # Object-level authorization: Hospital staff only views their hospital's patient predictions
         q = q.filter(models.PatientPrediction.hospital_id == u.hospital_id)
     total = q.count()
@@ -444,11 +955,11 @@ def history(
 
 
 @router.get("/prediction/{patient_id}")
-def prediction_by_id(patient_id: str, db: Session = Depends(get_db), u: models.User = Depends(current_user)):
+def prediction_by_id(patient_id: str, db: Session = Depends(get_db), u: models.User = Depends(active_user)):
     p = db.query(models.PatientPrediction).filter_by(patient_identifier=patient_id).first()
     if not p:
         raise HTTPException(404, "Prediction not found")
-    if u.role == "hospital_staff" and p.hospital_id != u.hospital_id:
+    if u.role in ("hospital_staff", "doctor") and p.hospital_id != u.hospital_id:
         # Object-level authorization: Deny cross-hospital record access
         raise HTTPException(403, f"Access forbidden: Patient record belongs to another hospital node")
     return _pred_json(p)

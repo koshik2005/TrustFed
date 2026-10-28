@@ -13,6 +13,13 @@ export const MOCK_USERS: Record<UserRole, User> = {
     role: 'hospital_staff',
     hospitalId: 'hosp-bgh-01',
   },
+  doctor: {
+    id: 'usr-doc-01',
+    name: 'Dr. Gregory House, MD',
+    email: 'doctor@trustfed.ai',
+    role: 'doctor',
+    hospitalId: 'hosp-bgh-01',
+  },
   regional_admin: {
     id: 'usr-reg-02',
     name: 'Dr. Marcus Vance',

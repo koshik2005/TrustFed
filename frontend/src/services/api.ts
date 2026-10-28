@@ -2,7 +2,8 @@ import apiClient from './apiClient';
 import type {
   TrainingSession, RoundMetric, PredictionResult,
   PatientVitals, FairnessReport, PrivacyReport,
-  AuditEntry, PaginatedResponse, Hospital, User
+  AuditEntry, PaginatedResponse, Hospital, User,
+  RegionalHub, RegionalHospital
 } from '../types';
 import {
   MOCK_HOSPITALS, MOCK_SESSION, MOCK_METRICS,
@@ -255,6 +256,98 @@ export const authApi = {
     const res = await apiClient.post<LoginResponse>('/auth/refresh');
     return res.data;
   },
+
+  resetPassword: async (currentPassword: string, newPassword: string): Promise<{ message: string; user: User }> => {
+    const res = await apiClient.post<{ message: string; user: User }>('/auth/reset-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return res.data;
+  },
+};
+
+// ── Regional Hubs Management (Global Admin) ───────────────────────────────────
+export const hubsApi = {
+  list: async (): Promise<RegionalHub[]> => {
+    const res = await apiClient.get<RegionalHub[]>('/admin/hubs');
+    return res.data;
+  },
+
+  create: async (hub: { id: string; name: string; region: string }): Promise<void> => {
+    await apiClient.post('/admin/hubs', hub);
+  },
+
+  update: async (hubId: string, data: { name?: string; region?: string }): Promise<void> => {
+    await apiClient.put(`/admin/hubs/${hubId}`, data);
+  },
+
+  suspend: async (hubId: string): Promise<void> => {
+    await apiClient.post(`/admin/hubs/${hubId}/suspend`);
+  },
+
+  reactivate: async (hubId: string): Promise<void> => {
+    await apiClient.post(`/admin/hubs/${hubId}/reactivate`);
+  },
+
+  delete: async (hubId: string): Promise<void> => {
+    await apiClient.delete(`/admin/hubs/${hubId}`);
+  },
+
+  issueAdmin: async (hubId: string, payload: { name: string; email: string }): Promise<{ user: User; temp_password: string }> => {
+    const res = await apiClient.post<{ user: User; temp_password: string }>(`/admin/hubs/${hubId}/admins`, payload);
+    return res.data;
+  },
+
+  listAdmins: async (hubId: string): Promise<User[]> => {
+    const res = await apiClient.get<User[]>(`/admin/hubs/${hubId}/admins`);
+    return res.data;
+  },
+};
+
+// ── Hospital Management (Regional Admin & Global Admin) ────────────────────────
+export const regionalHospitalsApi = {
+  list: async (): Promise<RegionalHospital[]> => {
+    const res = await apiClient.get<RegionalHospital[]>('/regional/hospitals');
+    return res.data;
+  },
+
+  create: async (hospital: { id: string; name: string; hub_id?: string; share_deidentified?: boolean }): Promise<void> => {
+    await apiClient.post('/regional/hospitals', hospital);
+  },
+
+  update: async (hospitalId: string, data: { name?: string; share_deidentified?: boolean }): Promise<void> => {
+    await apiClient.put(`/regional/hospitals/${hospitalId}`, data);
+  },
+
+  suspend: async (hospitalId: string): Promise<void> => {
+    await apiClient.post(`/regional/hospitals/${hospitalId}/suspend`);
+  },
+
+  reactivate: async (hospitalId: string): Promise<void> => {
+    await apiClient.post(`/regional/hospitals/${hospitalId}/reactivate`);
+  },
+
+  delete: async (hospitalId: string): Promise<void> => {
+    await apiClient.delete(`/regional/hospitals/${hospitalId}`);
+  },
+
+  issueUser: async (hospitalId: string, payload: { name: string; email: string; role: 'hospital_staff' | 'doctor' }): Promise<{ user: User; temp_password: string }> => {
+    const res = await apiClient.post<{ user: User; temp_password: string }>(`/regional/hospitals/${hospitalId}/users`, payload);
+    return res.data;
+  },
+
+  listUsers: async (hospitalId: string): Promise<User[]> => {
+    const res = await apiClient.get<User[]>(`/regional/hospitals/${hospitalId}/users`);
+    return res.data;
+  },
+
+  suspendUser: async (userId: string | number): Promise<void> => {
+    await apiClient.post(`/regional/users/${userId}/suspend`);
+  },
+
+  deleteUser: async (userId: string | number): Promise<void> => {
+    await apiClient.delete(`/regional/users/${userId}`);
+  },
 };
 
 export const api = {
@@ -263,4 +356,6 @@ export const api = {
   predictionApi,
   teflApi,
   auditApi,
+  hubsApi,
+  regionalHospitalsApi,
 };
