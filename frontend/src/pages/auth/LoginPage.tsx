@@ -99,7 +99,7 @@ export default function LoginPage() {
             <span className="text-base flex-shrink-0">⚠️</span>
             <div className="flex flex-col">
               <span className="font-semibold text-amber-950">DEMO ENVIRONMENT</span>
-              <span className="text-[11px] text-amber-800">No real patient data. Evaluation test credentials only.</span>
+              <span className="text-[11px] text-amber-800">synthetic data only</span>
             </div>
           </div>
 

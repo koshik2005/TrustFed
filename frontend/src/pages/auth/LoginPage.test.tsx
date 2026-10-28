@@ -33,7 +33,7 @@ describe('LoginPage Security Invariants & Error Handling', () => {
       </MemoryRouter>
     );
     expect(screen.getByText(/DEMO ENVIRONMENT/i)).not.toBeNull();
-    expect(screen.getByText(/No real patient data/i)).not.toBeNull();
+    expect(screen.getByText(/synthetic data only/i)).not.toBeNull();
   });
 
   it('proves login fails and displays error when the backend returns 401 Unauthorized', async () => {

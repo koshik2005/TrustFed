@@ -25,7 +25,9 @@ client = TestClient(app)
 
 
 def setup_module(module):
+    from db.migrations.v2_general_disease_migration import migrate_up
     Base.metadata.create_all(bind=engine)
+    migrate_up(engine)
     db = SessionLocal()
     try:
         # Seed test hospital users
