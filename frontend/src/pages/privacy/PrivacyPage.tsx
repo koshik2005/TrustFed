@@ -109,6 +109,21 @@ export default function PrivacyPage() {
         </Card>
       </div>
 
+      {/* Target Epsilon / Accountant Transparency Notice */}
+      {(report as any)?.targetEpsilon != null && !(report as any)?.targetMet && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs relative z-10">
+          <span className="text-lg flex-shrink-0">⚠️</span>
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold text-amber-950">
+              Accountant Stability Cap Active (Target ε = {(report as any).targetEpsilon.toFixed(2)} Not Met)
+            </span>
+            <p className="text-amber-800 leading-relaxed">
+              To prevent gradient explosion and neural weight collapse on small hospital sample cohorts, Gaussian noise is clamped to σ ≤ 3.5. Under this stability ceiling, the RDP accountant certifies an actual spent privacy loss of <strong>ε = {report?.epsilon != null ? report.epsilon.toFixed(2) : 'N/A'}</strong> at δ = 1e-5. This real spent budget is reported transparently rather than claiming an unachieved target.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* COMPARISON SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
         

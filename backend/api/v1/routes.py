@@ -75,6 +75,16 @@ def _user_json(u: models.User) -> Dict[str, Any]:
     return {"id": str(u.id), "name": u.name, "email": u.email, "role": u.role, "hospitalId": u.hospital_id}
 
 
+def _cookie_samesite(request: Request) -> str:
+    forced = os.getenv("COOKIE_SAMESITE")
+    if forced:
+        return forced.lower()
+    sec_site = request.headers.get("sec-fetch-site", "")
+    if sec_site == "cross-site":
+        return "none"
+    return "lax"
+
+
 @router.post("/auth/login")
 @limiter.limit("5/minute")
 def login(request: Request, body: LoginBody, response: Response, db: Session = Depends(get_db)):
@@ -100,13 +110,13 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
     db.add(rf)
     db.commit()
 
-    # Deliver refresh token via httpOnly, Secure, SameSite=None cookie (supports cross-site Vercel <-> Render)
+    # Deliver refresh token via httpOnly, Secure cookie (SameSite=lax for first-party Vercel rewrite, none for cross-site)
     response.set_cookie(
         key="tf_refresh_token",
         value=tokens["refresh_token"],
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=_cookie_samesite(request),
         path="/api/auth",
         max_age=7 * 86400,
     )
@@ -121,6 +131,7 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
 
 @router.post("/auth/refresh")
 def refresh_session(
+    request: Request,
     response: Response,
     tf_refresh_token: Optional[str] = Cookie(None),
     x_csrf_token: Optional[str] = Header(None, alias="X-CSRF-Token"),
@@ -172,7 +183,7 @@ def refresh_session(
         value=tokens["refresh_token"],
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=_cookie_samesite(request),
         path="/api/auth",
         max_age=7 * 86400,
     )
@@ -330,14 +341,14 @@ def _active_model(db: Session):
                 .order_by(models.FLSession.id.desc()).all())
 
     for s in sessions:
-        if s.model_path and os.path.exists(s.model_path):
+        if s.model_path and os.path.exists(s.model_path) and s.session_id != "FL-DEFAULT-PRETRAINED":
             try:
                 m = inference.load_model(s.model_path)
                 # Verify that the model didn't diverge during noisy training (margin between -15 and +15)
                 z3, _ = nn.forward(m["theta"], np.zeros((1, 13)))
                 margin = float(z3[0, 1] - z3[0, 0])
                 if -15.0 < margin < 15.0:
-                    return s, m
+                    return s, m, False
             except Exception:
                 continue
 
@@ -358,23 +369,31 @@ def _active_model(db: Session):
             db.add(s_default)
             db.commit()
             db.refresh(s_default)
-        return s_default, inference.load_model(DEFAULT_MODEL_PATH)
+        return s_default, inference.load_model(DEFAULT_MODEL_PATH), True
 
     raise HTTPException(409, "No trained model available.")
 
 
 def _pred_json(p: models.PatientPrediction):
+    is_fallback = (p.session_id == "FL-DEFAULT-PRETRAINED")
+    model_version = "TF-HeartNet-v2 (Pretrained Baseline)" if is_fallback else f"TF-HeartNet-v2 (Session {p.session_id})"
     return {
-        "patientId": p.patient_identifier, "riskScore": p.risk_score,
-        "riskLabel": inference.risk_label(p.risk_score), "confidence": p.confidence,
-        "nlpExplanation": p.explanation_text, "shapValues": json.loads(p.shap_values or "[]"),
+        "patientId": p.patient_identifier,
+        "riskScore": p.risk_score,
+        "riskLabel": inference.risk_label(p.risk_score),
+        "confidence": p.confidence,
+        "nlpExplanation": p.explanation_text,
+        "shapValues": json.loads(p.shap_values or "[]"),
+        "modelVersion": model_version,
+        "isFallback": is_fallback,
+        "disclaimer": "Clinical decision support only, not a diagnosis. For use by qualified healthcare professionals.",
         "predictedAt": str(p.created_at)
     }
 
 
 @router.post("/prediction/predict")
 def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.User = Depends(current_user)):
-    s, model = _active_model(db)
+    s, model, is_fallback = _active_model(db)
     try:
         r = inference.predict(model, vitals)
     except ValueError as e:
@@ -396,7 +415,12 @@ def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.Use
     db.add(row)
     db.commit()
     db.refresh(row)
-    store.add_audit(db, s.session_id, u.email, "prediction", f"Risk prediction {pid}: {r['riskLabel']} ({r['riskScore']:.2f})")
+
+    if is_fallback:
+        store.add_audit(db, s.session_id, u.email, "prediction",
+                        f"Inference model fallback to pretrained_cleveland.npz baseline for patient {pid}")
+    store.add_audit(db, s.session_id, u.email, "prediction",
+                    f"Risk prediction {pid}: {r['riskLabel']} ({r['riskScore']:.2f}) [Model: {s.session_id}]")
     return _pred_json(row)
 
 
@@ -454,11 +478,31 @@ def privacy_report(session_id: str, db: Session = Depends(get_db), u=Depends(req
     r = db.query(models.PrivacyReport).filter_by(session_id=_resolve_sid(db, session_id)).first()
     if not r:
         raise HTTPException(404, "No privacy report: the session has not finished (or does not exist).")
+
+    sess = db.query(models.FLSession).filter_by(session_id=r.session_id).first()
+    target_eps = None
+    target_met = True
+    if sess and sess.config_json:
+        try:
+            cfg = json.loads(sess.config_json)
+            target_eps = cfg.get("target_epsilon")
+            if target_eps is not None and r.epsilon is not None:
+                target_met = bool(r.epsilon <= float(target_eps) + 0.05)
+        except Exception:
+            pass
+
     return {
-        "sessionId": r.session_id, "attackSuccessWithDP": r.attack_success_with_dp,
-        "attackSuccessWithoutDP": r.attack_success_without_dp, "privacyResistance": r.privacy_resistance,
-        "epsilon": r.epsilon, "delta": r.delta, "heKeySize": r.he_key_size,
-        "paillierEnabled": r.paillier_enabled, "generatedAt": str(r.generated_at)
+        "sessionId": r.session_id,
+        "attackSuccessWithDP": r.attack_success_with_dp,
+        "attackSuccessWithoutDP": r.attack_success_without_dp,
+        "privacyResistance": r.privacy_resistance,
+        "epsilon": r.epsilon,
+        "delta": r.delta,
+        "targetEpsilon": target_eps,
+        "targetMet": target_met,
+        "heKeySize": r.he_key_size,
+        "paillierEnabled": r.paillier_enabled,
+        "generatedAt": str(r.generated_at)
     }
 
 

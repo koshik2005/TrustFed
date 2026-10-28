@@ -137,3 +137,21 @@ def start_job(session_id: str, cfg: dict):
     t = threading.Thread(target=_train_job, args=(session_id, pipeline.clean_config(cfg)), daemon=True)
     t.start()
     return t
+
+
+def migrate_legacy_predictions(db: Session):
+    """Ensure all existing PatientPrediction records have an associated hospital_id."""
+    unassigned = db.query(models.PatientPrediction).filter(
+        (models.PatientPrediction.hospital_id == None) | (models.PatientPrediction.hospital_id == "")
+    ).all()
+    if unassigned:
+        count = 0
+        for p in unassigned:
+            if p.user_id:
+                u = db.query(models.User).filter_by(id=p.user_id).first()
+                p.hospital_id = u.hospital_id if (u and u.hospital_id) else "1"
+            else:
+                p.hospital_id = "1"
+            count += 1
+        db.commit()
+        print(f"[MIGRATION] Assigned hospital_id to {count} legacy patient predictions.")

@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
-import { MOCK_USERS } from '@/services/mockData';
 
 const DEMO_EMAIL: Record<UserRole, string> = {
   hospital_staff: 'hospital@trustfed.ai',
@@ -30,35 +29,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuthStore();
+  const { login, isBackendWakingUp } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleLoginSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const submitLogin = async (loginEmail: string, loginPassword: string) => {
     setLoading(true);
     setError('');
     try {
-      const { token, user, csrf_token } = await api.authApi.login(email, password);
+      const { token, user, csrf_token } = await api.authApi.login(loginEmail, loginPassword);
       login(user, token, csrf_token);
       navigate('/dashboard');
     } catch (err: unknown) {
-      // If the backend returned 401/429 or is re-deploying, seamlessly allow valid test accounts through
-      const isDemoAccount =
-        (email === 'hospital@trustfed.ai' || email === 'regional@trustfed.ai' || email === 'admin@trustfed.ai') &&
-        password === 'password123';
-
-      if (isDemoAccount) {
-        const demoUser =
-          email === 'admin@trustfed.ai'
-            ? MOCK_USERS.global_admin
-            : email === 'regional@trustfed.ai'
-            ? MOCK_USERS.regional_admin
-            : MOCK_USERS.hospital_staff;
-        login(demoUser, `tf-demo-jwt-${demoUser.role}-${Date.now()}`, 'demo-csrf-token');
-        navigate('/dashboard');
-        return;
-      }
-
       const msg = err instanceof Error ? err.message : 'Invalid email or password.';
       setError(msg);
     } finally {
@@ -66,11 +47,17 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickDemoAccess = (role: UserRole) => {
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    await submitLogin(email, password);
+  };
+
+  const handleQuickDemoAccess = async (role: UserRole) => {
     setSelectedRole(role);
-    const user = MOCK_USERS[role];
-    login(user, `tf-token-${role}`, 'mock-demo-csrf');
-    navigate('/dashboard');
+    const targetEmail = DEMO_EMAIL[role];
+    setEmail(targetEmail);
+    setPassword('password123');
+    await submitLogin(targetEmail, 'password123');
   };
 
   return (
@@ -105,6 +92,15 @@ export default function LoginPage() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live v2.0
             </span>
+          </div>
+
+          {/* Visible Demo Environment Notice */}
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs font-medium">
+            <span className="text-base flex-shrink-0">⚠️</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-amber-950">DEMO ENVIRONMENT</span>
+              <span className="text-[11px] text-amber-800">No real patient data. Evaluation test credentials only.</span>
+            </div>
           </div>
 
           {/* Quick 1-Click Demo Access */}
@@ -200,7 +196,19 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+            {isBackendWakingUp && (
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-850 text-xs font-medium flex items-center gap-2 animate-pulse">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600 flex-shrink-0" />
+                <span>Backend server is waking up on Render free tier. Retrying automatically...</span>
+              </div>
+            )}
+
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-start gap-2">
+                <span className="text-red-500 font-bold">•</span>
+                <span>{error}</span>
+              </div>
+            )}
             
             <Button
               type="submit"

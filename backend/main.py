@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         store.seed_users(db)
+        store.migrate_legacy_predictions(db)
         from db import models
         for s in db.query(models.FLSession).filter_by(status="running").all():
             s.status, s.error = "failed", "server restarted during training"
@@ -80,6 +81,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     env = os.getenv("ENVIRONMENT", "development").strip().lower()
     if env in ("production", "prod") or bool(os.getenv("RENDER")):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
@@ -92,19 +94,25 @@ app.include_router(api_router)
 
 
 @app.get("/")
+@app.head("/")
 def root():
     return {"message": "TrustFed-Health backend is running.", "status": "ok", "version": "2.0.0"}
 
 
 @app.get("/health")
+@app.head("/health")
+@app.get("/api/health")
+@app.head("/api/health")
 def health(db: Session = Depends(get_db)):
     db_status = "connected"
     try:
         db.execute(text("SELECT 1"))
     except Exception as e:
         db_status = f"degraded: {str(e)}"
+    allow_demo = os.getenv("ALLOW_DEMO_USERS", "true").strip().lower() in ("true", "1", "yes")
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
+        "allow_demo_users": allow_demo,
         "version": "2.0.0"
     }

@@ -38,6 +38,12 @@ jobs:
       - name: Run TEFL Algorithmic & Cryptographic Tests
         run: python tests/test_tefl.py
 
+      - name: Run Clinical Risk Presets Inference Tests
+        run: python tests/verify_presets.py
+
+      - name: Run Privacy Honesty & Accountant Verification Tests
+        run: python tests/test_privacy_honesty.py
+
   frontend-ci:
     name: Frontend Lint, Test & Build
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ import type {
   AuditEntry, PaginatedResponse, Hospital, User
 } from '../types';
 import {
-  MOCK_USERS, MOCK_HOSPITALS, MOCK_SESSION, MOCK_METRICS,
+  MOCK_HOSPITALS, MOCK_SESSION, MOCK_METRICS,
   computeMockPrediction, MOCK_INITIAL_PREDICTION,
   MOCK_FAIRNESS_REPORT, MOCK_PRIVACY_REPORT,
   MOCK_COMPARISON_DATA, MOCK_AUDIT_LOGS
@@ -200,24 +200,46 @@ export const authApi = {
       const res = await apiClient.post<LoginResponse>('/auth/login', { email, password });
       return res.data;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { detail?: string; message?: string } } };
-      // If server explicitly returned 401, 400, 429, etc., propagate the exact error message
+      const axiosErr = err as {
+        response?: {
+          status?: number;
+          headers?: Record<string, string>;
+          data?: { detail?: string; message?: string };
+        };
+        code?: string;
+        message?: string;
+      };
       if (axiosErr.response) {
+        const status = axiosErr.response.status;
+        if (status === 429) {
+          const retryAfter = axiosErr.response.headers?.['retry-after'];
+          const detail = axiosErr.response.data?.detail || axiosErr.response.data?.message;
+          const msg = detail || (retryAfter
+            ? `Too many login attempts. Please try again in ${retryAfter} seconds.`
+            : 'Too many login attempts. Please wait a moment and try again.');
+          const customErr = new Error(msg) as Error & { status?: number };
+          customErr.status = 429;
+          throw customErr;
+        }
+        if (status === 401) {
+          const customErr = new Error('Invalid email or password.') as Error & { status?: number };
+          customErr.status = 401;
+          throw customErr;
+        }
         const errorMsg =
           axiosErr.response.data?.detail ||
           axiosErr.response.data?.message ||
-          (axiosErr.response.status === 429 ? 'Rate limit exceeded. Please wait a moment.' : 'Invalid email or password.');
-        throw new Error(errorMsg);
+          `Server returned error (${status}).`;
+        const customErr = new Error(errorMsg) as Error & { status?: number };
+        customErr.status = status;
+        throw customErr;
       }
-      // Server unreachable / offline demo fallback
-      let user: User = MOCK_USERS.hospital_staff;
-      if (email.includes('admin') || email.startsWith('admin@')) {
-        user = MOCK_USERS.global_admin;
-      } else if (email.includes('regional') || email.startsWith('regional@')) {
-        user = MOCK_USERS.regional_admin;
-      }
-      const token = `tf-mock-jwt-${user.role}-${Date.now()}`;
-      return { token, user, csrf_token: 'mock-csrf' };
+      // Server unreachable / network timeout / cold start
+      const networkMsg =
+        'Backend server is waking up or temporarily unreachable. Please wait a few seconds and try again.';
+      const netErr = new Error(networkMsg) as Error & { status?: number };
+      netErr.status = 503;
+      throw netErr;
     }
   },
 

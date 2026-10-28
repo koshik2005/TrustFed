@@ -106,8 +106,19 @@ export default function PredictionPage() {
                 <p className="text-slate-500 text-xs font-medium">Federated Multi-Hospital Cardiac Risk Classifier</p>
               </div>
               <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs px-2.5 py-1 font-semibold self-start sm:self-auto">
-                Model: TF-HeartNet-v2
+                Model: {(predictionResult as any)?.modelVersion || 'TF-HeartNet-v2 (Active)'}
               </Badge>
+            </div>
+
+            {/* Explicit Clinical Disclaimer */}
+            <div className="mb-5 flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 text-xs">
+              <span className="text-base flex-shrink-0">⚠️</span>
+              <div>
+                <span className="font-semibold text-amber-950">Clinical Decision Support Only — Not a Diagnostic Evaluation: </span>
+                <span className="text-amber-800 leading-relaxed">
+                  This tool provides assistive statistical risk estimation based on multi-hospital federated learning. It does not replace comprehensive medical examination, physician judgement, or diagnostic laboratory testing.
+                </span>
+              </div>
             </div>
 
             {/* Clinical Presets */}
@@ -260,9 +271,16 @@ export default function PredictionPage() {
               <span className="text-slate-500 text-xs font-mono font-medium tracking-wide">
                 Patient Case #{predictionResult?.patientId ?? 'PT-892401'}
               </span>
-              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-semibold">
-                Privacy-Preserving Inference
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                {(predictionResult as any)?.isFallback && (
+                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
+                    Baseline Model
+                  </Badge>
+                )}
+                <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-semibold">
+                  Privacy-Preserving Inference
+                </Badge>
+              </div>
             </div>
 
             {predicted ? (
