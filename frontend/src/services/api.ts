@@ -414,6 +414,20 @@ export const clinicalApi = {
     const res = await apiClient.post<ClinicalEncounter>(`/hospital/encounters/${encounterId}/confirm`, payload);
     return res.data;
   },
+
+  predictDifferential: async (payload: {
+    age: number;
+    sex: number | string;
+    symptoms: string[];
+    symptom_duration_days?: number;
+    vitals?: ClinicalVitals;
+    structured_ecg_finding?: string;
+    optional_labs?: Record<string, any>;
+    hospital_id?: string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/clinical/predict', payload);
+    return res.data;
+  },
 };
 
 export const api = {

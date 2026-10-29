@@ -197,4 +197,115 @@ describe('Phase 3: Clinical Patient & Doctor Confirmation UI', () => {
       expect(screen.queryByRole('button', { name: /Confirm Diagnosis & Mark Trainable/i })).not.toBeInTheDocument();
     });
   });
+
+  it('EncounterDetailPage renders red flags, adaptive questioning, remedies label, and disclaimer', async () => {
+    useAuthStore.getState().login({
+      id: '2',
+      name: 'Dr. Ross',
+      email: 'doctor@trustfed.ai',
+      role: 'doctor',
+      hospitalId: '1',
+    }, 'mock-doctor-token');
+
+    vi.mocked(clinicalApi.getEncounterDetail).mockResolvedValue({
+      id: 77,
+      encounterIdentifier: 'ENC-RED-77',
+      patientId: 105,
+      hospitalId: '1',
+      symptoms: ['chest_pain', 'breathlessness'],
+      symptomDurationDays: 1,
+      vitals: { temp_c: 37.0, bp_sys: 155, bp_dia: 95, hr: 110, spo2: 89 },
+      structuredEcgFinding: 'st_change',
+      modelVersion: 'TF-GenDisease-v1.0',
+      predictedTop3: [
+        { disease: 'Coronary Artery Disease (CAD)', probability: 0.58 },
+        { disease: 'Community-Acquired Pneumonia', probability: 0.28 },
+        { disease: 'Bronchial Asthma Exacerbation', probability: 0.14 },
+      ],
+      hasCriticalRedFlag: true,
+      redFlags: [
+        {
+          ruleId: 'CARDIAC_ACUTE_CORONARY_SYNDROME',
+          severity: 'CRITICAL',
+          title: 'Suspected Acute Coronary Syndrome (ACS)',
+          description: 'Chest pain with breathlessness detected.',
+          escalationAction: 'Immediate 12-lead ECG stat and cardiac monitoring.'
+        },
+        {
+          ruleId: 'CRITICAL_HYPOXIA',
+          severity: 'CRITICAL',
+          title: 'Severe Hypoxemic Respiratory Failure',
+          description: 'SpO2 is 89%.',
+          escalationAction: 'Initiate supplemental oxygen immediately.'
+        }
+      ],
+      adaptiveQuestion: {
+        suggestedParameter: 'spo2',
+        label: 'Oxygen Saturation (SpO2)',
+        action: 'Measure pulse oximetry',
+        reason: 'Differentiates pulmonary vs cardiac causes.',
+        prompt: 'Add SpO2 to improve this result',
+        uiPrompt: 'Add SpO2 to improve this result',
+        expectedInformationGain: 0.50
+      },
+      explanations: {
+        topCondition: 'Coronary Artery Disease (CAD)',
+        contributions: [
+          { feature: 'Symptom: Chest Pain', rawFeature: 'sym_chest_pain', impact: 2.8, direction: 'supports' }
+        ],
+        positiveContributions: [
+          { feature: 'Symptom: Chest Pain', rawFeature: 'sym_chest_pain', impact: 2.8, direction: 'supports' }
+        ],
+        negativeContributions: []
+      },
+      suggestedClinicalGuidance: {
+        label: 'Suggested, clinician must verify',
+        verificationNotice: 'Suggested, clinician must verify.',
+        disease: 'Coronary Artery Disease (CAD)',
+        suggestedCause: 'Atherosclerotic coronary artery plaque rupture.',
+        commonRemedies: ['Aspirin 300mg stat', 'Nitroglycerin sublingual', 'Urgent cardiology consult']
+      },
+      disclaimer: 'Clinical decision support only, not a diagnosis.',
+      doctorConfirmedDiagnosis: null,
+      trainable: false,
+      status: 'pending',
+      patient: {
+        id: 105,
+        patientIdentifier: 'PT-999',
+        hospitalId: '1',
+        name: 'Eva Mendes',
+        age: 58,
+        sex: 0,
+        sexLabel: 'Female',
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/encounters/77']}>
+        <Routes>
+          <Route path="/encounters/:id" element={<EncounterDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      // 1. Red-flag override banner
+      expect(screen.getByText(/CRITICAL CLINICAL RED-FLAG SAFETY OVERRIDE/i)).toBeInTheDocument();
+      expect(screen.getByText(/Suspected Acute Coronary Syndrome/i)).toBeInTheDocument();
+      expect(screen.getByText(/Severe Hypoxemic Respiratory Failure/i)).toBeInTheDocument();
+
+      // 2. Adaptive question
+      expect(screen.getByText(/Add SpO2 to improve this result/i)).toBeInTheDocument();
+
+      // 3. Feature contribution
+      expect(screen.getByText(/\+2.8 Symptom: Chest Pain/i)).toBeInTheDocument();
+
+      // 4. Suggested guidance & label
+      expect(screen.getByText(/Suggested, clinician must verify/i)).toBeInTheDocument();
+      expect(screen.getByText(/Atherosclerotic coronary artery plaque rupture/i)).toBeInTheDocument();
+
+      // 5. Mandatory disclaimer
+      expect(screen.getByText(/Clinical decision support only, not a diagnosis/i)).toBeInTheDocument();
+    });
+  });
 });

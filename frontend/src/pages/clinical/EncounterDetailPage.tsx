@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Stethoscope, CheckCircle2, Clock, AlertCircle, ArrowLeft,
   Activity, Thermometer, Heart, User, ShieldCheck,
-  Check, Loader2, Sparkles, Lock
+  Check, Loader2, Sparkles, Lock, AlertTriangle
 } from 'lucide-react';
 import { clinicalApi } from '@/services/api';
 import type { ClinicalEncounter } from '@/types';
@@ -194,6 +194,58 @@ export default function EncounterDetailPage() {
         </div>
       </div>
 
+      {/* Critical Red-Flag Safety Override Banner */}
+      {(encounter.hasCriticalRedFlag || (encounter.redFlags && encounter.redFlags.length > 0)) && (
+        <div className="bg-rose-50 border-2 border-rose-500 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-rose-900 font-extrabold text-sm tracking-wide">
+              <AlertTriangle className="w-5 h-5 text-rose-600 animate-pulse" />
+              CRITICAL CLINICAL RED-FLAG SAFETY OVERRIDE
+            </div>
+            <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-rose-600 text-white tracking-wider">
+              Immediate Escalation Stat
+            </span>
+          </div>
+          <div className="space-y-2">
+            {encounter.redFlags?.map((rf) => (
+              <div key={rf.ruleId} className="bg-white/95 border border-rose-200 rounded-xl p-3.5 space-y-1.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-950">{rf.title}</span>
+                  <span className="text-[10px] font-mono font-semibold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">{rf.ruleId}</span>
+                </div>
+                <p className="text-xs text-rose-800 leading-relaxed">{rf.description}</p>
+                <div className="text-xs font-semibold text-rose-900 pt-1 border-t border-rose-100 mt-1">
+                  Immediate Action: <span className="font-medium text-rose-950">{rf.escalationAction || rf.action}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Adaptive Questioning Guidance */}
+      {encounter.adaptiveQuestion && (
+        <div className="bg-indigo-50/90 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-indigo-950">Diagnostic Refinement Recommendation</span>
+                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+                  Top-1 Confidence &lt; 65%
+                </span>
+              </div>
+              <p className="text-xs text-indigo-800 mt-0.5">{encounter.adaptiveQuestion.reason}</p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs shrink-0">
+            <span>{encounter.adaptiveQuestion.uiPrompt || encounter.adaptiveQuestion.prompt || `Add ${encounter.adaptiveQuestion.label} to improve this result`}</span>
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Clinical Evidence + Differential Diagnosis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Presenting Symptoms & Vitals */}
@@ -353,11 +405,81 @@ export default function EncounterDetailPage() {
               )}
             </div>
 
-            <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-[11px] text-blue-900 flex items-start gap-2">
-              <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
-              <span>
-                Model evaluated: <strong>{encounter.modelVersion || 'TF-GenDisease-v1.0'}</strong>. Prediction must be reviewed and confirmed by an attending physician.
-              </span>
+            {/* Feature Contributions (SHAP Attributions) */}
+            {encounter.explanations?.positiveContributions && encounter.explanations.positiveContributions.length > 0 && (
+              <div className="pt-3 border-t border-blue-100 space-y-2">
+                <span className="text-xs font-bold text-slate-800 block">
+                  Top Feature Contributions (for {encounter.explanations.topCondition}):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {encounter.explanations.positiveContributions.slice(0, 4).map((c, i) => (
+                    <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      +{c.impact} {c.feature}
+                    </span>
+                  ))}
+                  {encounter.explanations.negativeContributions?.slice(0, 2).map((c, i) => (
+                    <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                      {c.impact} {c.feature}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Suggested Etiology & First-Line Remedies */}
+            {encounter.suggestedClinicalGuidance && (
+              <div className="pt-3 border-t border-blue-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    Suggested Cause & Common Remedies
+                  </span>
+                  <span className="text-[10px] italic font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Suggested, clinician must verify
+                  </span>
+                </div>
+                {encounter.suggestedClinicalGuidance.suggestedCause && (
+                  <div className="text-xs text-slate-700 bg-white/90 p-2.5 rounded-xl border border-slate-200/80">
+                    <strong className="text-slate-900 block mb-0.5">Etiology:</strong>
+                    {encounter.suggestedClinicalGuidance.suggestedCause}
+                  </div>
+                )}
+                {encounter.suggestedClinicalGuidance.commonRemedies && encounter.suggestedClinicalGuidance.commonRemedies.length > 0 && (
+                  <div className="text-xs text-slate-700 bg-white/90 p-2.5 rounded-xl border border-slate-200/80">
+                    <strong className="text-slate-900 block mb-1">Common First-Line Protocol:</strong>
+                    <ul className="list-disc list-inside space-y-0.5 text-slate-600">
+                      {encounter.suggestedClinicalGuidance.commonRemedies.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {!isConfirmed && !isStaffOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (encounter.suggestedClinicalGuidance?.suggestedCause) setCause(encounter.suggestedClinicalGuidance.suggestedCause);
+                      if (encounter.suggestedClinicalGuidance?.commonRemedies) setTreatment(encounter.suggestedClinicalGuidance.commonRemedies.join('; '));
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
+                    Copy suggested etiology & remedies to confirmation form ↓
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Mandatory Disclaimer */}
+            <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] text-amber-900 font-medium flex items-center gap-2">
+              <AlertCircle size={15} className="text-amber-600 shrink-0" />
+              <span>{encounter.disclaimer || 'Clinical decision support only, not a diagnosis.'}</span>
+            </div>
+
+            {/* Model Version & Fallback Indicator */}
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-500 flex items-center justify-between">
+              <span>Model version: <strong>{encounter.modelVersion || 'TF-GenDisease-v1.0'}</strong></span>
+              {encounter.isFallback && (
+                <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Fallback heuristic active</span>
+              )}
             </div>
           </div>
         </div>

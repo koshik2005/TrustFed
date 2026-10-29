@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 import numpy as np
 from db.database import get_db
 from db import models
-from services import auth, crypto, inference, store, disease_inference, clinical_validation
+from services import auth, crypto, inference, store, disease_inference, clinical_validation, general_disease_model
 from services.explanation import generate_clinical_explanation
 from tefl import nn
 
@@ -1072,6 +1072,17 @@ class EncounterCreateBody(BaseModel):
     optional_labs: Optional[Dict[str, Any]] = None
 
 
+class ClinicalPredictBody(BaseModel):
+    age: int = 40
+    sex: Any = 0
+    symptoms: list = []
+    symptom_duration_days: Optional[int] = 1
+    vitals: Optional[Dict[str, Any]] = None
+    structured_ecg_finding: Optional[str] = None
+    optional_labs: Optional[Dict[str, Any]] = None
+    hospital_id: Optional[str] = None
+
+
 class DoctorConfirmationBody(BaseModel):
     confirmed_diagnosis: str
     cause: str
@@ -1116,18 +1127,37 @@ def _encounter_json(e: models.Encounter, patient: Optional[models.Patient] = Non
         if doc:
             conf_by_name = doc.name
 
+    symptoms_list = json.loads(e.symptoms) if e.symptoms else []
+    vitals_dict = json.loads(e.vitals) if e.vitals else {}
+    labs_dict = json.loads(e.optional_labs) if e.optional_labs else {}
+
+    # Real-time differential evaluation for red-flags, explanations, and guidance
+    eval_res = general_disease_model.predict_differential(
+        age=patient.age if patient else 40,
+        sex=patient.sex if patient else 0,
+        symptoms=symptoms_list,
+        symptom_duration_days=e.symptom_duration_days or 1,
+        vitals=vitals_dict,
+        optional_labs=labs_dict,
+        structured_ecg=e.structured_ecg_finding,
+        hospital_confirmed_records=[
+            {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
+            for c in db.query(models.Encounter).filter_by(hospital_id=e.hospital_id, trainable=True).all()
+        ] if db else None
+    )
+
     res = {
         "id": e.id,
         "encounterIdentifier": e.encounter_identifier,
         "patientId": e.patient_id,
         "hospitalId": e.hospital_id,
-        "symptoms": json.loads(e.symptoms) if e.symptoms else [],
+        "symptoms": symptoms_list,
         "symptomDurationDays": e.symptom_duration_days,
-        "vitals": json.loads(e.vitals) if e.vitals else {},
+        "vitals": vitals_dict,
         "structuredEcgFinding": e.structured_ecg_finding,
-        "optionalLabs": json.loads(e.optional_labs) if e.optional_labs else {},
-        "modelVersion": e.model_version,
-        "predictedTop3": json.loads(e.predicted_top3) if e.predicted_top3 else [],
+        "optionalLabs": labs_dict,
+        "modelVersion": e.model_version or eval_res["modelVersion"],
+        "predictedTop3": json.loads(e.predicted_top3) if e.predicted_top3 else eval_res["predictedTop3"],
         "doctorConfirmedDiagnosis": e.doctor_confirmed_diagnosis,
         "cause": e.cause,
         "treatment": e.treatment,
@@ -1137,6 +1167,13 @@ def _encounter_json(e: models.Encounter, patient: Optional[models.Patient] = Non
         "trainable": bool(e.trainable),
         "status": "confirmed" if e.doctor_confirmed_diagnosis else "pending",
         "createdAt": e.created_at.isoformat() if e.created_at else None,
+        "redFlags": eval_res["redFlags"],
+        "hasCriticalRedFlag": eval_res["hasCriticalRedFlag"],
+        "adaptiveQuestion": eval_res["adaptiveQuestion"],
+        "explanations": eval_res["explanations"],
+        "suggestedClinicalGuidance": eval_res["suggestedClinicalGuidance"],
+        "disclaimer": eval_res["disclaimer"],
+        "isFallback": eval_res["isFallback"],
     }
     if patient:
         res["patient"] = _patient_json(patient, include_phi=include_phi)
@@ -1153,6 +1190,65 @@ def get_standard_symptoms(u=Depends(require(*CLINICAL_ROLES))):
         ],
         "ecgFindings": sorted(list(clinical_validation.VALID_ECG_FINDINGS)),
     }
+
+
+@router.post("/clinical/predict")
+def predict_clinical_differential(
+    body: ClinicalPredictBody,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    """Predicts differential diagnosis with calibrated top 3, red-flags, explanations, and adaptive questioning."""
+    hospital_id = _resolve_hospital_scope(u, body.hospital_id) if (u.role != "global_admin" or body.hospital_id) else (u.hospital_id or "1")
+
+    # Validate inputs
+    enc_errors = {}
+    valid_enc, enc_errors = clinical_validation.validate_encounter_payload({
+        "symptoms": body.symptoms,
+        "symptom_duration_days": body.symptom_duration_days,
+        "vitals": body.vitals,
+        "structured_ecg_finding": body.structured_ecg_finding,
+        "optional_labs": body.optional_labs
+    })
+    if not valid_enc:
+        raise HTTPException(status_code=422, detail={"errors": enc_errors, "message": "Clinical validation failed."})
+
+    sex_int = 0
+    if isinstance(body.sex, int):
+        sex_int = body.sex
+    elif str(body.sex).lower() in ("male", "m", "1"):
+        sex_int = 1
+    elif str(body.sex).lower() in ("other", "o", "2"):
+        sex_int = 2
+
+    hospital_records = None
+    if hospital_id:
+        hospital_records = [
+            {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
+            for c in db.query(models.Encounter).filter_by(hospital_id=hospital_id, trainable=True).all()
+        ]
+
+    diff_res = general_disease_model.predict_differential(
+        age=body.age,
+        sex=sex_int,
+        symptoms=body.symptoms or [],
+        symptom_duration_days=int(body.symptom_duration_days or 1),
+        vitals=body.vitals or {},
+        optional_labs=body.optional_labs or {},
+        structured_ecg=body.structured_ecg_finding,
+        hospital_confirmed_records=hospital_records
+    )
+
+    if diff_res.get("isFallback") and hospital_id:
+        store.add_audit(
+            db,
+            session_id=None,
+            node_id=hospital_id,
+            event_type="model_fallback",
+            description=f"Fallback model used for clinical evaluation: {diff_res.get('fallbackReason', 'Fallback active')}"
+        )
+
+    return diff_res
 
 
 @router.post("/hospital/patients")
@@ -1209,11 +1305,30 @@ def register_patient_and_encounter(
 
     encounter = None
     if body.symptoms:
-        top3 = disease_inference.predict_top3(
+        hospital_records = [
+            {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
+            for c in db.query(models.Encounter).filter_by(hospital_id=hospital_id, trainable=True).all()
+        ]
+        diff_res = general_disease_model.predict_differential(
+            age=patient.age,
+            sex=patient.sex,
             symptoms=body.symptoms,
+            symptom_duration_days=int(body.symptom_duration_days or 1),
             vitals=body.vitals or {},
-            labs=body.optional_labs or {}
+            optional_labs=body.optional_labs or {},
+            structured_ecg=body.structured_ecg_finding,
+            hospital_confirmed_records=hospital_records,
         )
+        if diff_res.get("isFallback"):
+            store.add_audit(
+                db,
+                session_id=None,
+                node_id=hospital_id,
+                event_type="model_fallback",
+                description=f"Fallback model used for patient {patient.patient_identifier}: {diff_res.get('fallbackReason', 'Fallback active')}"
+            )
+        top3 = diff_res["predictedTop3"]
+        model_version = diff_res["modelVersion"]
         enc_id = f"ENC-{uuid.uuid4().hex[:8].upper()}"
         encounter = models.Encounter(
             encounter_identifier=enc_id,
@@ -1224,7 +1339,7 @@ def register_patient_and_encounter(
             vitals=json.dumps(body.vitals or {}),
             structured_ecg_finding=body.structured_ecg_finding,
             optional_labs=json.dumps(body.optional_labs or {}),
-            model_version="TF-GenDisease-v1.0",
+            model_version=model_version,
             predicted_top3=json.dumps(top3),
             doctor_confirmed_diagnosis=None,
             trainable=False,
@@ -1334,11 +1449,30 @@ def create_patient_encounter(
             detail={"errors": enc_errors, "message": "Clinical validation failed."}
         )
 
-    top3 = disease_inference.predict_top3(
+    hospital_records = [
+        {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
+        for c in db.query(models.Encounter).filter_by(hospital_id=patient.hospital_id, trainable=True).all()
+    ]
+    diff_res = general_disease_model.predict_differential(
+        age=patient.age,
+        sex=patient.sex,
         symptoms=body.symptoms,
+        symptom_duration_days=int(body.symptom_duration_days or 1),
         vitals=body.vitals or {},
-        labs=body.optional_labs or {}
+        optional_labs=body.optional_labs or {},
+        structured_ecg=body.structured_ecg_finding,
+        hospital_confirmed_records=hospital_records,
     )
+    if diff_res.get("isFallback"):
+        store.add_audit(
+            db,
+            session_id=None,
+            node_id=patient.hospital_id,
+            event_type="model_fallback",
+            description=f"Fallback model used for encounter: {diff_res.get('fallbackReason', 'Fallback active')}"
+        )
+    top3 = diff_res["predictedTop3"]
+    model_version = diff_res["modelVersion"]
 
     enc_id = f"ENC-{uuid.uuid4().hex[:8].upper()}"
     encounter = models.Encounter(
@@ -1350,7 +1484,7 @@ def create_patient_encounter(
         vitals=json.dumps(body.vitals or {}),
         structured_ecg_finding=body.structured_ecg_finding,
         optional_labs=json.dumps(body.optional_labs or {}),
-        model_version="TF-GenDisease-v1.0",
+        model_version=model_version,
         predicted_top3=json.dumps(top3),
         doctor_confirmed_diagnosis=None,
         trainable=False,

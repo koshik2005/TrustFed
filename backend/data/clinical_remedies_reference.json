@@ -1,0 +1,189 @@
+{
+  "version": "1.0",
+  "disclaimer": "Suggested clinical decision support reference only. Clinician must verify before ordering medication.",
+  "conditions": {
+    "common_cold": {
+      "code": "COLD",
+      "name": "Common Cold (Viral Rhinitis)",
+      "category": "Upper Respiratory",
+      "suggested_causes": [
+        "Rhinovirus infection (~50%)",
+        "Seasonal coronavirus, adenovirus, or RSV",
+        "Upper airway mucosal inflammation"
+      ],
+      "common_remedies": "Adequate oral hydration, rest, saline nasal rinse/spray, paracetamol 500-1000mg PRN for headache/malaise, first-generation antihistamines or decongestants if nasal congestion severe. Antibiotics NOT indicated."
+    },
+    "influenza": {
+      "code": "FLU",
+      "name": "Influenza (Seasonal Flu)",
+      "category": "Respiratory",
+      "suggested_causes": [
+        "Influenza A or B viral infection with systemic cytokine response",
+        "Respiratory droplet transmission during seasonal epidemic"
+      ],
+      "common_remedies": "Bed rest, oral fluids, paracetamol or ibuprofen for fever and myalgias. Consider oseltamivir (Tamiflu 75mg BD for 5 days) if within 48 hours of symptom onset or high-risk patient. Monitor for secondary bacterial pneumonia."
+    },
+    "viral_fever": {
+      "code": "VIRAL_FEVER",
+      "name": "Acute Viral Pyrexia",
+      "category": "Infectious",
+      "suggested_causes": [
+        "Self-limiting systemic viral infection (Enterovirus, Adenovirus, Parvovirus)",
+        "Non-specific viremia with endogenous pyrogen release"
+      ],
+      "common_remedies": "Symptomatic antipyretic therapy with paracetamol (650mg QDS PRN), liberal fluid intake (2-3 L/day), oral rehydration salts, tepid sponging if temp > 39°C. Re-evaluate if fever persists > 5 days."
+    },
+    "dengue": {
+      "code": "DENGUE",
+      "name": "Dengue Fever (Breakbone Fever)",
+      "category": "Infectious / Arbovirus",
+      "suggested_causes": [
+        "Dengue virus (DENV 1-4) transmission via Aedes aegypti / albopictus vector",
+        "Capillary fragility and immune-mediated thrombocytopenia"
+      ],
+      "common_remedies": "Strict oral rehydration therapy (ORS, fruit juices, electrolyte solutions). Paracetamol 500-650mg for pyrexia (DO NOT prescribe NSAIDs, aspirin, or corticosteroids due to hemorrhage risk). Daily CBC monitoring for hematocrit rise and platelet nadir."
+    },
+    "typhoid": {
+      "code": "TYPHOID",
+      "name": "Typhoid Enteric Fever",
+      "category": "Infectious / Bacterial",
+      "suggested_causes": [
+        "Salmonella enterica serovar Typhi / Paratyphi bacterial infection",
+        "Fecal-oral transmission via contaminated water or food"
+      ],
+      "common_remedies": "Targeted antibiotic therapy: Azithromycin 1g/day oral x 7 days or IV Ceftriaxone 2g/day x 10-14 days based on local susceptibility. High-calorie bland diet, electrolyte repletion, monitor for intestinal perforation or GI bleed in 2nd-3rd week."
+    },
+    "malaria": {
+      "code": "MALARIA",
+      "name": "Malaria",
+      "category": "Infectious / Parasitic",
+      "suggested_causes": [
+        "Plasmodium falciparum or P. vivax protozoan infection via Anopheles mosquito bite",
+        "Intraerythrocytic schizogony causing cyclical paroxysmal pyrexia"
+      ],
+      "common_remedies": "Artemisinin-based combination therapy (ACT, e.g. Artemether-Lumefantrine oral or IV Artesunate for severe/cerebral malaria). Primaquine for P. vivax radical cure after G6PD testing. Fluid management and glucose monitoring."
+    },
+    "covid19": {
+      "code": "COVID19",
+      "name": "COVID-19 / Acute Respiratory Illness",
+      "category": "Respiratory / Viral",
+      "suggested_causes": [
+        "SARS-CoV-2 coronavirus infection with upper/lower respiratory inflammation",
+        "Aerosol transmission and host angiotensin-converting enzyme 2 (ACE2) binding"
+      ],
+      "common_remedies": "Home isolation, pulse oximetry tracking (target SpO2 >= 94%), hydration, antipyretics. If SpO2 < 94% or high risk: oral nirmatrelvir-ritonavir (Paxlovid) within 5 days, or dexamethasone 6mg/day if requiring supplemental oxygen."
+    },
+    "gastroenteritis": {
+      "code": "GASTROENTERITIS",
+      "name": "Acute Gastroenteritis / Food Poisoning",
+      "category": "Gastrointestinal",
+      "suggested_causes": [
+        "Viral gastroenteritis (Norovirus, Rotavirus)",
+        "Bacterial toxin (Staphylococcus aureus, Bacillus cereus, Campylobacter, Salmonella)",
+        "Dietary indiscretion or contaminated water intake"
+      ],
+      "common_remedies": "Aggressive oral rehydration with WHO-ORS formula (1-2 glasses per loose stool), zinc supplementation, probiotics. Avoid anti-motility agents (loperamide) in bloody/febrile diarrhea. Reserve antibiotics (ciprofloxacin or azithromycin) for severe dysentery."
+    },
+    "uti": {
+      "code": "UTI",
+      "name": "Urinary Tract Infection (Cystitis)",
+      "category": "Urinary",
+      "suggested_causes": [
+        "Ascending bacterial colonization, primarily Uropathogenic E. coli (80%)",
+        "Klebsiella, Proteus mirabilis, or Enterococcus species"
+      ],
+      "common_remedies": "Oral Nitrofurantoin 100mg BD x 5 days or Fosfomycin trometamol 3g single dose or Trimethoprim-sulfamethoxazole (if local resistance < 20%). Increased water intake, urinary alkalinizers (potassium citrate) for dysuria relief. Urine culture if recurrent."
+    },
+    "pneumonia": {
+      "code": "PNEUMONIA",
+      "name": "Community-Acquired Pneumonia (CAP)",
+      "category": "Lower Respiratory",
+      "suggested_causes": [
+        "Streptococcus pneumoniae (pneumococcus)",
+        "Atypical pathogens (Mycoplasma pneumoniae, Chlamydia pneumoniae, Legionella)",
+        "Viral lower respiratory involvement (Influenza, RSV, SARS-CoV-2)"
+      ],
+      "common_remedies": "Outpatient: Amoxicillin 1g TDS oral + Azithromycin 500mg daily or Doxycycline. Inpatient / severe (CURB-65 >= 2): IV Ceftriaxone 2g daily + Macrolide, supplemental oxygen to maintain SpO2 >= 92%, chest physiotherapy."
+    },
+    "bronchitis": {
+      "code": "BRONCHITIS",
+      "name": "Acute Bronchitis",
+      "category": "Lower Respiratory",
+      "suggested_causes": [
+        "Viral tracheobronchial mucosal inflammation (>90%: Influenza, Parainfluenza, Coronavirus)",
+        "Airway hyperreactivity and post-infectious bronchial irritation"
+      ],
+      "common_remedies": "Supportive care, humidified air, honey/dextromethorphan for sleep-disturbing cough, inhaled salbutamol / albuterol bronchodilator if wheezing present. Antibiotics provide no proven clinical benefit in uncomplicated viral bronchitis."
+    },
+    "asthma": {
+      "code": "ASTHMA",
+      "name": "Bronchial Asthma Exacerbation",
+      "category": "Respiratory / Allergic",
+      "suggested_causes": [
+        "Reversible bronchospasm and eosinophilic airway inflammation",
+        "Triggered by viral respiratory infection, aeroallergens, cold air, or physical exertion"
+      ],
+      "common_remedies": "Inhaled short-acting beta-2 agonist (Salbutamol 4-8 puffs via spacer Q20min for 1 hour), short course oral corticosteroids (Prednisolone 40-50mg/day x 5 days), inhaled corticosteroid maintenance (ICS-Formoterol). Monitor peak expiratory flow."
+    },
+    "hypertension": {
+      "code": "HYPERTENSION",
+      "name": "Essential Hypertension",
+      "category": "Cardiovascular",
+      "suggested_causes": [
+        "Primary essential systemic vascular resistance elevation",
+        "High dietary sodium, arterial stiffness, sympathetic overactivity, metabolic factors"
+      ],
+      "common_remedies": "Lifestyle modification (DASH diet, sodium < 2g/day, weight management, aerobic exercise). Pharmacotherapy based on stage: ACE inhibitor / ARB (e.g. Telmisartan 40mg), Amlodipine 5mg, or Thiazide diuretic. Confirm home BP diary."
+    },
+    "type2_diabetes": {
+      "code": "TYPE2_DIABETES",
+      "name": "Type 2 Diabetes Mellitus",
+      "category": "Endocrine / Metabolic",
+      "suggested_causes": [
+        "Peripheral insulin resistance combined with progressive pancreatic beta-cell secretory defect",
+        "Genetic predisposition compounded by adiposity and sedentary lifestyle"
+      ],
+      "common_remedies": "Lifestyle optimization (medical nutrition therapy, regular physical activity). First-line pharmacotherapy: Metformin 500mg-1000mg BD with meals. Add SGLT2 inhibitor (Empagliflozin) or GLP-1 RA if cardiorenal risk factors present. Target HbA1c < 7.0%."
+    },
+    "anemia": {
+      "code": "ANEMIA",
+      "name": "Iron Deficiency / Nutritional Anemia",
+      "category": "Hematological",
+      "suggested_causes": [
+        "Negative iron balance from chronic occult blood loss (GI, menorrhagia) or inadequate dietary intake",
+        "Impaired gastrointestinal absorption (celiac, atrophic gastritis)"
+      ],
+      "common_remedies": "Oral ferrous ascorbate or ferrous sulfate 100-200mg elemental iron daily on empty stomach with Vitamin C (avoid tea/calcium within 2 hours). Treat underlying cause of blood loss. Parenteral iron (ferric carboxymaltose) if intolerant or severe."
+    },
+    "migraine": {
+      "code": "MIGRAINE",
+      "name": "Migraine / Vascular Cephalea",
+      "category": "Neurological",
+      "suggested_causes": [
+        "Trigeminovascular system activation with neurogenic dural inflammation and cortical spreading depression",
+        "Sensory hypersensitivity triggered by stress, sleep disruption, or dietary factors"
+      ],
+      "common_remedies": "Acute abortive therapy: Oral Triptan (Sumatriptan 50-100mg or Rizatriptan 10mg) taken early at onset + NSAID (Naproxen 500mg). Rest in dark, quiet room. If frequent (>4/month), initiate prophylaxis (Propranolol, Topiramate, or Amitriptyline)."
+    },
+    "allergic_rhinitis": {
+      "code": "ALLERGIC_RHINITIS",
+      "name": "Allergic Rhinitis (Hay Fever)",
+      "category": "Allergic / Immunological",
+      "suggested_causes": [
+        "IgE-mediated type I hypersensitivity reaction to airborne allergens (pollen, dust mites, mold, animal dander)",
+        "Nasal mucosal histamine and leukotriene degranulation"
+      ],
+      "common_remedies": "Intranasal corticosteroid spray (Fluticasone furoate or Mometasone 1-2 sprays/nostril daily - gold standard). Second-generation non-sedating oral antihistamine (Cetirizine 10mg, Fexofenadine 120mg). Saline nasal irrigation. Allergen avoidance."
+    },
+    "heart_disease": {
+      "code": "CARDIAC_CAD",
+      "name": "Coronary Artery Disease (CAD)",
+      "category": "Cardiovascular",
+      "suggested_causes": [
+        "Atherosclerotic coronary artery plaque causing demand-supply myocardial ischemia",
+        "Risk factors: hypertension, dyslipidemia, diabetes, tobacco use, age, genetic predisposition"
+      ],
+      "common_remedies": "Immediate antiplatelet therapy (Aspirin 75-100mg daily), high-intensity statin (Atorvastatin 40-80mg), sublingual nitroglycerin PRN for angina, beta-blocker (Metoprolol succinate). Prompt cardiology evaluation, 12-lead ECG, troponin, and coronary angiography."
+    }
+  }
+}

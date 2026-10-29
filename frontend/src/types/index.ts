@@ -236,6 +236,50 @@ export interface ClinicalPatient {
   createdAt?: string | null;
 }
 
+export interface RedFlagAlert {
+  ruleId: string;
+  severity: 'CRITICAL' | 'HIGH';
+  title: string;
+  description: string;
+  escalationAction: string;
+  action?: string;
+  evidence?: string;
+}
+
+export interface AdaptiveQuestion {
+  suggestedParameter: string;
+  parameter?: string;
+  label: string;
+  action: string;
+  reason: string;
+  prompt: string;
+  uiPrompt?: string;
+  expectedInformationGain?: number;
+}
+
+export interface FeatureContribution {
+  feature: string;
+  rawFeature?: string;
+  impact: number;
+  direction: 'supports' | 'refutes';
+}
+
+export interface ClinicalExplanation {
+  topCondition: string;
+  contributions: FeatureContribution[];
+  positiveContributions: FeatureContribution[];
+  negativeContributions: FeatureContribution[];
+}
+
+export interface SuggestedClinicalGuidance {
+  label: string;
+  verificationNotice: string;
+  disease: string;
+  suggestedCause?: string | null;
+  suggestedRemedies?: string[] | null;
+  commonRemedies?: string[] | null;
+}
+
 export interface ClinicalEncounter {
   id: number;
   encounterIdentifier: string;
@@ -258,5 +302,12 @@ export interface ClinicalEncounter {
   status: 'pending' | 'confirmed';
   createdAt?: string | null;
   patient?: ClinicalPatient;
+  redFlags?: RedFlagAlert[];
+  hasCriticalRedFlag?: boolean;
+  adaptiveQuestion?: AdaptiveQuestion | null;
+  explanations?: ClinicalExplanation | null;
+  suggestedClinicalGuidance?: SuggestedClinicalGuidance | null;
+  disclaimer?: string;
+  isFallback?: boolean;
 }
 
