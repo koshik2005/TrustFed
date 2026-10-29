@@ -430,6 +430,57 @@ export const clinicalApi = {
   },
 };
 
+export const federatedApi = {
+  getEligibility: async (minRecords: number = 5): Promise<any> => {
+    const res = await apiClient.get('/federated/hospitals/eligibility', { params: { min_records: minRecords } });
+    return res.data;
+  },
+
+  triggerRound: async (payload?: {
+    min_records?: number;
+    epochs?: number;
+    learning_rate?: number;
+    clip?: number;
+    noise_multiplier?: number;
+    target_epsilon?: number;
+    fairness_tolerance?: number;
+    regression_tolerance?: number;
+  }): Promise<any> => {
+    const res = await apiClient.post('/federated/rounds/trigger', payload || {});
+    return res.data;
+  },
+
+  listModels: async (params?: { scope?: string; status?: string }): Promise<any> => {
+    const res = await apiClient.get('/federated/models', { params });
+    return res.data;
+  },
+
+  rollbackModel: async (version: string, reason?: string): Promise<any> => {
+    const res = await apiClient.post(`/federated/models/${version}/rollback`, { reason });
+    return res.data;
+  },
+
+  getRegionalDeidentifiedRecords: async (hubId: string): Promise<any> => {
+    const res = await apiClient.get(`/regional/hubs/${hubId}/deidentified-records`);
+    return res.data;
+  },
+
+  updateHospitalConsent: async (hospitalId: string, shareDeidentified: boolean): Promise<any> => {
+    const res = await apiClient.post(`/hospitals/${hospitalId}/consent`, { share_deidentified: shareDeidentified });
+    return res.data;
+  },
+
+  getPrivacyAccounting: async (params?: {
+    rounds?: number;
+    sigma?: number;
+    clip?: number;
+    target_epsilon?: number;
+  }): Promise<any> => {
+    const res = await apiClient.get('/privacy/accounting', { params });
+    return res.data;
+  },
+};
+
 export const api = {
   authApi,
   trainingApi,
@@ -439,4 +490,6 @@ export const api = {
   hubsApi,
   regionalHospitalsApi,
   clinicalApi,
+  federatedApi,
 };
+

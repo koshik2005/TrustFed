@@ -506,6 +506,19 @@ def get_model() -> GeneralDiseaseModel:
     return _MODEL_INSTANCE
 
 
+def set_model_weights(W: np.ndarray, b: np.ndarray, version: str) -> GeneralDiseaseModel:
+    model = get_model()
+    model.W = np.array(W, dtype=np.float32).copy()
+    model.b = np.array(b, dtype=np.float32).copy()
+    model.version = version
+    return model
+
+
+def get_active_model_version() -> str:
+    return get_model().version
+
+
+
 def predict_differential(
     age: int,
     sex: Any,
