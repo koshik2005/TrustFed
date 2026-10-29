@@ -4,29 +4,34 @@ import {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
   Shield, ShieldAlert, Network, BarChart3, ScrollText,
   Settings, LogOut, ChevronRight, Menu, X, ShieldCheck,
-  UserCheck, HeartPulse, Loader2, Hospital
+  UserCheck, HeartPulse, Loader2, Hospital, Users,
+  UserPlus, Stethoscope
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/utils';
 import type { NavItem } from '@/types';
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',  label: 'Hospital Dashboard', path: '/dashboard',  icon: 'LayoutDashboard', roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
-  { id: 'prediction', label: 'Patient Prediction', path: '/prediction', icon: 'BrainCircuit',     roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
-  { id: 'explain',    label: 'Explainability',      path: '/explain',    icon: 'FlaskConical',     roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
-  { id: 'hubs',       label: 'Regional Hubs',       path: '/hubs',       icon: 'Network',          roles: ['global_admin'] },
-  { id: 'regional',   label: 'Regional Hospitals',  path: '/regional',   icon: 'Hospital',         roles: ['regional_admin', 'global_admin'] },
-  { id: 'training',   label: 'Global Training',     path: '/training',   icon: 'Activity',         roles: ['regional_admin', 'global_admin'] },
-  { id: 'comparison', label: 'Model Comparison',    path: '/comparison', icon: 'BarChart3',        roles: ['regional_admin', 'global_admin'] },
-  { id: 'fairness',   label: 'Fairness Audit',      path: '/fairness',   icon: 'ShieldAlert',      roles: ['global_admin'] },
-  { id: 'privacy',    label: 'Privacy Report',      path: '/privacy',    icon: 'Shield',           roles: ['global_admin'] },
-  { id: 'audit',      label: 'Audit Log',           path: '/audit',      icon: 'ScrollText',       roles: ['global_admin'] },
-  { id: 'settings',   label: 'Settings',            path: '/settings',   icon: 'Settings',         roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'dashboard',             label: 'Hospital Dashboard',    path: '/dashboard',     icon: 'LayoutDashboard', roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'patients',              label: 'Patient Directory',     path: '/patients',      icon: 'Users',           roles: ['hospital_staff', 'doctor', 'global_admin'] },
+  { id: 'new-patient',           label: 'New Patient Intake',    path: '/patients/new',  icon: 'UserPlus',        roles: ['hospital_staff', 'doctor', 'global_admin'] },
+  { id: 'pending-confirmations', label: 'Doctor Confirmations', path: '/doctor/pending', icon: 'Stethoscope',    roles: ['doctor', 'global_admin'] },
+  { id: 'prediction',            label: 'Cardiac Prediction',    path: '/prediction',    icon: 'BrainCircuit',    roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'explain',               label: 'Explainability',        path: '/explain',       icon: 'FlaskConical',    roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'hubs',                  label: 'Regional Hubs',         path: '/hubs',          icon: 'Network',         roles: ['global_admin'] },
+  { id: 'regional',              label: 'Regional Hospitals',    path: '/regional',      icon: 'Hospital',        roles: ['regional_admin', 'global_admin'] },
+  { id: 'training',              label: 'Global Training',       path: '/training',      icon: 'Activity',        roles: ['regional_admin', 'global_admin'] },
+  { id: 'comparison',            label: 'Model Comparison',      path: '/comparison',    icon: 'BarChart3',       roles: ['regional_admin', 'global_admin'] },
+  { id: 'fairness',              label: 'Fairness Audit',        path: '/fairness',      icon: 'ShieldAlert',     roles: ['global_admin'] },
+  { id: 'privacy',               label: 'Privacy Report',        path: '/privacy',       icon: 'Shield',          roles: ['global_admin'] },
+  { id: 'audit',                 label: 'Audit Log',             path: '/audit',         icon: 'ScrollText',      roles: ['global_admin'] },
+  { id: 'settings',              label: 'Settings',              path: '/settings',      icon: 'Settings',        roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
 ];
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
   Shield, ShieldAlert, Network, BarChart3, ScrollText, Settings, Hospital,
+  Users, UserPlus, Stethoscope,
 };
 
 export default function DashboardLayout() {

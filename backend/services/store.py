@@ -7,7 +7,8 @@ from db import models
 from . import auth, pipeline
 
 DEMO_USERS = [
-    ("hospital@trustfed.ai", "Dr. Hospital Staff", "hospital_staff", "1"),
+    ("hospital@trustfed.ai", "Nurse Sarah Chen", "hospital_staff", "1"),
+    ("doctor@trustfed.ai", "Dr. Anthony Ross", "doctor", "1"),
     ("regional@trustfed.ai", "Regional Admin", "regional_admin", None),
     ("admin@trustfed.ai", "Global Admin", "global_admin", None),
 ]

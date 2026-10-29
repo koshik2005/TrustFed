@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 import numpy as np
 from db.database import get_db
 from db import models
-from services import auth, inference, store
+from services import auth, crypto, inference, store, disease_inference, clinical_validation
 from services.explanation import generate_clinical_explanation
 from tefl import nn
 
@@ -97,6 +97,8 @@ def require(*roles: str):
 
 ANY = ("hospital_staff", "doctor", "regional_admin", "global_admin")
 ADMINS = ("regional_admin", "global_admin")
+CLINICAL_ROLES = ("hospital_staff", "doctor", "global_admin")
+DOCTOR_ROLES = ("doctor", "global_admin")
 
 
 class LoginBody(BaseModel):
@@ -1042,3 +1044,543 @@ def audit_logs(
 @router.get("/audit/verify")
 def audit_verify(db: Session = Depends(get_db), u=Depends(require(*ADMINS))):
     return store.verify_chain(db)
+
+
+# ── Phase 3: Clinical Patient Entry & Doctor Confirmation Workflow ────────────
+
+class PatientRegistrationBody(BaseModel):
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    age: int
+    sex: Any
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    # Optional initial encounter data
+    symptoms: Optional[list] = None
+    symptom_duration_days: Optional[int] = 1
+    vitals: Optional[Dict[str, Any]] = None
+    structured_ecg_finding: Optional[str] = None
+    optional_labs: Optional[Dict[str, Any]] = None
+    hospital_id: Optional[str] = None
+
+
+class EncounterCreateBody(BaseModel):
+    symptoms: list
+    symptom_duration_days: Optional[int] = 1
+    vitals: Optional[Dict[str, Any]] = None
+    structured_ecg_finding: Optional[str] = None
+    optional_labs: Optional[Dict[str, Any]] = None
+
+
+class DoctorConfirmationBody(BaseModel):
+    confirmed_diagnosis: str
+    cause: str
+    treatment: str
+
+
+def _resolve_hospital_scope(u: models.User, target_hospital_id: Optional[str] = None) -> str:
+    if u.role in ("hospital_staff", "doctor"):
+        if not u.hospital_id:
+            raise HTTPException(400, "User is not assigned to a hospital node")
+        if target_hospital_id and target_hospital_id != u.hospital_id:
+            raise HTTPException(403, "Access forbidden: cannot act on another hospital")
+        return u.hospital_id
+    elif u.role == "global_admin":
+        return target_hospital_id or "1"
+    else:
+        raise HTTPException(403, "Role cannot perform hospital operations")
+
+
+def _patient_json(p: models.Patient, include_phi: bool = True) -> Dict[str, Any]:
+    name = crypto.decrypt_phi(p.name_encrypted) if (include_phi and p.name_encrypted) else None
+    contact = crypto.decrypt_phi(p.contact_encrypted) if (include_phi and p.contact_encrypted) else None
+    return {
+        "id": p.id,
+        "patientIdentifier": p.patient_identifier,
+        "hospitalId": p.hospital_id,
+        "name": name,
+        "contact": contact,
+        "age": p.age,
+        "sex": p.sex,
+        "sexLabel": "Female" if p.sex == 0 else ("Male" if p.sex == 1 else "Other"),
+        "weight": p.weight,
+        "height": p.height,
+        "createdAt": p.created_at.isoformat() if p.created_at else None,
+    }
+
+
+def _encounter_json(e: models.Encounter, patient: Optional[models.Patient] = None, include_phi: bool = True, db: Optional[Session] = None) -> Dict[str, Any]:
+    conf_by_name = None
+    if e.confirmed_by and db:
+        doc = db.query(models.User).filter_by(id=e.confirmed_by).first()
+        if doc:
+            conf_by_name = doc.name
+
+    res = {
+        "id": e.id,
+        "encounterIdentifier": e.encounter_identifier,
+        "patientId": e.patient_id,
+        "hospitalId": e.hospital_id,
+        "symptoms": json.loads(e.symptoms) if e.symptoms else [],
+        "symptomDurationDays": e.symptom_duration_days,
+        "vitals": json.loads(e.vitals) if e.vitals else {},
+        "structuredEcgFinding": e.structured_ecg_finding,
+        "optionalLabs": json.loads(e.optional_labs) if e.optional_labs else {},
+        "modelVersion": e.model_version,
+        "predictedTop3": json.loads(e.predicted_top3) if e.predicted_top3 else [],
+        "doctorConfirmedDiagnosis": e.doctor_confirmed_diagnosis,
+        "cause": e.cause,
+        "treatment": e.treatment,
+        "confirmedBy": e.confirmed_by,
+        "confirmedByName": conf_by_name,
+        "confirmedAt": e.confirmed_at.isoformat() if e.confirmed_at else None,
+        "trainable": bool(e.trainable),
+        "status": "confirmed" if e.doctor_confirmed_diagnosis else "pending",
+        "createdAt": e.created_at.isoformat() if e.created_at else None,
+    }
+    if patient:
+        res["patient"] = _patient_json(patient, include_phi=include_phi)
+    return res
+
+
+@router.get("/clinical/symptoms")
+def get_standard_symptoms(u=Depends(require(*CLINICAL_ROLES))):
+    """Returns standardized searchable symptom taxonomy and metadata."""
+    return {
+        "symptoms": [
+            {"code": k, "label": v}
+            for k, v in clinical_validation.STANDARD_SYMPTOMS.items()
+        ],
+        "ecgFindings": sorted(list(clinical_validation.VALID_ECG_FINDINGS)),
+    }
+
+
+@router.post("/hospital/patients")
+def register_patient_and_encounter(
+    body: PatientRegistrationBody,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    hospital_id = _resolve_hospital_scope(u, body.hospital_id)
+
+    # 1. Validate demographics server-side
+    dump = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+    valid_pt, pt_errors = clinical_validation.validate_patient_payload(dump)
+    enc_errors = {}
+    if body.symptoms is not None:
+        valid_enc, enc_errors = clinical_validation.validate_encounter_payload(dump)
+    else:
+        valid_enc = True
+
+    all_errors = {**pt_errors, **enc_errors}
+    if all_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"errors": all_errors, "message": "Clinical validation failed. Please check the values entered."}
+        )
+
+    # 2. Encrypt PHI at rest
+    name_encrypted = crypto.encrypt_phi(body.name) if body.name else ""
+    contact_encrypted = crypto.encrypt_phi(body.contact) if body.contact else ""
+
+    # Parse biological sex
+    sex_int = 0
+    if isinstance(body.sex, int):
+        sex_int = body.sex
+    elif str(body.sex).lower() in ("male", "m", "1"):
+        sex_int = 1
+    elif str(body.sex).lower() in ("other", "o", "2"):
+        sex_int = 2
+
+    patient_identifier = f"PT-{uuid.uuid4().hex[:8].upper()}"
+    patient = models.Patient(
+        patient_identifier=patient_identifier,
+        hospital_id=hospital_id,
+        name_encrypted=name_encrypted,
+        contact_encrypted=contact_encrypted,
+        age=int(body.age),
+        sex=sex_int,
+        weight=float(body.weight) if body.weight is not None else None,
+        height=float(body.height) if body.height is not None else None,
+    )
+    db.add(patient)
+    db.commit()
+    db.refresh(patient)
+
+    encounter = None
+    if body.symptoms:
+        top3 = disease_inference.predict_top3(
+            symptoms=body.symptoms,
+            vitals=body.vitals or {},
+            labs=body.optional_labs or {}
+        )
+        enc_id = f"ENC-{uuid.uuid4().hex[:8].upper()}"
+        encounter = models.Encounter(
+            encounter_identifier=enc_id,
+            patient_id=patient.id,
+            hospital_id=hospital_id,
+            symptoms=json.dumps(body.symptoms),
+            symptom_duration_days=int(body.symptom_duration_days or 1),
+            vitals=json.dumps(body.vitals or {}),
+            structured_ecg_finding=body.structured_ecg_finding,
+            optional_labs=json.dumps(body.optional_labs or {}),
+            model_version="TF-GenDisease-v1.0",
+            predicted_top3=json.dumps(top3),
+            doctor_confirmed_diagnosis=None,
+            trainable=False,
+        )
+        db.add(encounter)
+        db.commit()
+        db.refresh(encounter)
+
+    # Log to audit ledger
+    store.add_audit(
+        db,
+        session_id=None,
+        node_id=hospital_id,
+        event_type="patient_registration",
+        description=f"Patient {patient.patient_identifier} entered at hospital {hospital_id}" + (f" with initial encounter {encounter.encounter_identifier}" if encounter else "")
+    )
+
+    return {
+        "patient": _patient_json(patient, include_phi=True),
+        "encounter": _encounter_json(encounter, patient=patient, include_phi=True, db=db) if encounter else None,
+    }
+
+
+@router.get("/hospital/patients")
+def list_hospital_patients(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    hospital_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    hid = _resolve_hospital_scope(u, hospital_id)
+    patients = db.query(models.Patient).filter_by(hospital_id=hid).order_by(models.Patient.id.desc()).all()
+
+    results = []
+    search_lower = search.strip().lower() if search else None
+
+    for p in patients:
+        p_json = _patient_json(p, include_phi=True)
+        enc_count = db.query(models.Encounter).filter_by(patient_id=p.id).count()
+        last_enc = db.query(models.Encounter).filter_by(patient_id=p.id).order_by(models.Encounter.id.desc()).first()
+        p_json["encounterCount"] = enc_count
+        p_json["lastEncounterDate"] = last_enc.created_at.isoformat() if last_enc and last_enc.created_at else None
+        p_json["lastEncounterId"] = last_enc.id if last_enc else None
+
+        if search_lower:
+            match_name = bool(p_json["name"] and search_lower in p_json["name"].lower())
+            match_id = bool(search_lower in p.patient_identifier.lower())
+            if match_name or match_id:
+                results.append(p_json)
+        else:
+            results.append(p_json)
+
+    total = len(results)
+    start = (page - 1) * page_size
+    items = results[start:start + page_size]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": max(1, -(-total // page_size)),
+    }
+
+
+@router.get("/hospital/patients/{patient_id}")
+def get_hospital_patient_detail(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    patient = db.query(models.Patient).filter_by(id=patient_id).first()
+    if not patient:
+        raise HTTPException(404, "Patient not found")
+
+    if u.role in ("hospital_staff", "doctor") and patient.hospital_id != u.hospital_id:
+        raise HTTPException(403, "Access forbidden: Patient record belongs to another hospital node")
+
+    encounters = db.query(models.Encounter).filter_by(patient_id=patient.id).order_by(models.Encounter.id.desc()).all()
+    return {
+        "patient": _patient_json(patient, include_phi=True),
+        "encounters": [_encounter_json(e, patient=patient, include_phi=True, db=db) for e in encounters],
+    }
+
+
+@router.post("/hospital/patients/{patient_id}/encounters")
+def create_patient_encounter(
+    patient_id: int,
+    body: EncounterCreateBody,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    patient = db.query(models.Patient).filter_by(id=patient_id).first()
+    if not patient:
+        raise HTTPException(404, "Patient not found")
+
+    if u.role in ("hospital_staff", "doctor") and patient.hospital_id != u.hospital_id:
+        raise HTTPException(403, "Access forbidden: Patient record belongs to another hospital node")
+
+    enc_dump = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+    valid_enc, enc_errors = clinical_validation.validate_encounter_payload(enc_dump)
+    if not valid_enc:
+        raise HTTPException(
+            status_code=422,
+            detail={"errors": enc_errors, "message": "Clinical validation failed."}
+        )
+
+    top3 = disease_inference.predict_top3(
+        symptoms=body.symptoms,
+        vitals=body.vitals or {},
+        labs=body.optional_labs or {}
+    )
+
+    enc_id = f"ENC-{uuid.uuid4().hex[:8].upper()}"
+    encounter = models.Encounter(
+        encounter_identifier=enc_id,
+        patient_id=patient.id,
+        hospital_id=patient.hospital_id,
+        symptoms=json.dumps(body.symptoms),
+        symptom_duration_days=int(body.symptom_duration_days or 1),
+        vitals=json.dumps(body.vitals or {}),
+        structured_ecg_finding=body.structured_ecg_finding,
+        optional_labs=json.dumps(body.optional_labs or {}),
+        model_version="TF-GenDisease-v1.0",
+        predicted_top3=json.dumps(top3),
+        doctor_confirmed_diagnosis=None,
+        trainable=False,
+    )
+    db.add(encounter)
+    db.commit()
+    db.refresh(encounter)
+
+    store.add_audit(
+        db,
+        session_id=None,
+        node_id=patient.hospital_id,
+        event_type="encounter_created",
+        description=f"Encounter {enc_id} logged for patient {patient.patient_identifier}"
+    )
+
+    return _encounter_json(encounter, patient=patient, include_phi=True, db=db)
+
+
+@router.get("/hospital/encounters")
+def list_hospital_encounters(
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    hospital_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    hid = _resolve_hospital_scope(u, hospital_id)
+    q = db.query(models.Encounter).filter_by(hospital_id=hid)
+
+    if status == "pending":
+        q = q.filter(models.Encounter.doctor_confirmed_diagnosis == None)
+    elif status == "confirmed":
+        q = q.filter(models.Encounter.doctor_confirmed_diagnosis != None)
+
+    q = q.order_by(models.Encounter.id.desc())
+    all_encs = q.all()
+
+    patients_by_id = {p.id: p for p in db.query(models.Patient).filter_by(hospital_id=hid).all()}
+
+    results = []
+    search_lower = search.strip().lower() if search else None
+
+    for enc in all_encs:
+        p = patients_by_id.get(enc.patient_id)
+        enc_json = _encounter_json(enc, patient=p, include_phi=True, db=db)
+        if search_lower:
+            pt_name = (enc_json.get("patient") or {}).get("name") or ""
+            pt_id = (enc_json.get("patient") or {}).get("patientIdentifier") or ""
+            enc_id = enc.encounter_identifier or ""
+            if search_lower in pt_name.lower() or search_lower in pt_id.lower() or search_lower in enc_id.lower():
+                results.append(enc_json)
+        else:
+            results.append(enc_json)
+
+    total = len(results)
+    start = (page - 1) * page_size
+    items = results[start:start + page_size]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": max(1, -(-total // page_size)),
+    }
+
+
+@router.get("/hospital/encounters/{encounter_id}")
+def get_hospital_encounter_detail(
+    encounter_id: int,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    enc = db.query(models.Encounter).filter_by(id=encounter_id).first()
+    if not enc:
+        raise HTTPException(404, "Encounter not found")
+
+    if u.role in ("hospital_staff", "doctor") and enc.hospital_id != u.hospital_id:
+        raise HTTPException(403, "Access forbidden: Encounter belongs to another hospital node")
+
+    patient = db.query(models.Patient).filter_by(id=enc.patient_id).first()
+    return _encounter_json(enc, patient=patient, include_phi=True, db=db)
+
+
+@router.post("/hospital/encounters/{encounter_id}/confirm")
+def doctor_confirm_encounter(
+    encounter_id: int,
+    body: DoctorConfirmationBody,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    if u.role == "hospital_staff":
+        raise HTTPException(403, "Staff cannot mark records confirmed. Only attending doctors may confirm diagnoses.")
+
+    enc = db.query(models.Encounter).filter_by(id=encounter_id).first()
+    if not enc:
+        raise HTTPException(404, "Encounter not found")
+
+    if u.role == "doctor" and enc.hospital_id != u.hospital_id:
+        raise HTTPException(403, "Access forbidden: Encounter belongs to another hospital node")
+
+    if not body.confirmed_diagnosis or not body.confirmed_diagnosis.strip():
+        raise HTTPException(422, "Confirmed diagnosis is required.")
+    if not body.cause or not body.cause.strip():
+        raise HTTPException(422, "Clinical cause/etiology is required.")
+    if not body.treatment or not body.treatment.strip():
+        raise HTTPException(422, "Prescribed treatment/remedy is required.")
+
+    enc.doctor_confirmed_diagnosis = body.confirmed_diagnosis.strip()
+    enc.cause = body.cause.strip()
+    enc.treatment = body.treatment.strip()
+    enc.confirmed_by = u.id
+    enc.confirmed_at = datetime.datetime.now(datetime.timezone.utc)
+    enc.trainable = True
+
+    hosp = db.query(models.Hospital).filter_by(id=enc.hospital_id).first()
+    if hosp:
+        hosp.dataset_size = db.query(models.Encounter).filter_by(hospital_id=hosp.id, trainable=True).count()
+
+    db.commit()
+    db.refresh(enc)
+
+    store.add_audit(
+        db,
+        session_id=None,
+        node_id=enc.hospital_id,
+        event_type="diagnosis_confirmed",
+        description=f"Doctor {u.name} confirmed diagnosis '{enc.doctor_confirmed_diagnosis}' for encounter {enc.encounter_identifier}. Record marked trainable."
+    )
+
+    patient = db.query(models.Patient).filter_by(id=enc.patient_id).first()
+    return _encounter_json(enc, patient=patient, include_phi=True, db=db)
+
+
+@router.get("/regional/encounters")
+def regional_deidentified_encounters(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    u=Depends(require("regional_admin", "global_admin"))
+):
+    """Regional encounter feed. STRICTLY DE-IDENTIFIED: Patient name and contact are NEVER returned."""
+    if u.role == "regional_admin":
+        if not u.hub_id:
+            raise HTTPException(400, "Regional admin is not assigned to a hub")
+        hospital_ids = [h.id for h in db.query(models.Hospital).filter_by(hub_id=u.hub_id).all()]
+        q = db.query(models.Encounter).filter(models.Encounter.hospital_id.in_(hospital_ids))
+    else:
+        q = db.query(models.Encounter)
+
+    total = q.count()
+    encs = q.order_by(models.Encounter.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    pt_map = {p.id: p for p in db.query(models.Patient).filter(models.Patient.id.in_([e.patient_id for e in encs])).all()}
+
+    items = []
+    for e in encs:
+        p = pt_map.get(e.patient_id)
+        items.append({
+            "id": e.id,
+            "encounterIdentifier": e.encounter_identifier,
+            "patientIdentifier": p.patient_identifier if p else "UNKNOWN",
+            "hospitalId": e.hospital_id,
+            "age": p.age if p else None,
+            "sex": p.sex if p else None,
+            "sexLabel": ("Female" if p.sex == 0 else ("Male" if p.sex == 1 else "Other")) if p else None,
+            "symptoms": json.loads(e.symptoms) if e.symptoms else [],
+            "symptomDurationDays": e.symptom_duration_days,
+            "vitals": json.loads(e.vitals) if e.vitals else {},
+            "structuredEcgFinding": e.structured_ecg_finding,
+            "optionalLabs": json.loads(e.optional_labs) if e.optional_labs else {},
+            "modelVersion": e.model_version,
+            "predictedTop3": json.loads(e.predicted_top3) if e.predicted_top3 else [],
+            "doctorConfirmedDiagnosis": e.doctor_confirmed_diagnosis,
+            "trainable": bool(e.trainable),
+            "createdAt": e.created_at.isoformat() if e.created_at else None,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": max(1, -(-total // page_size)),
+    }
+
+
+@router.get("/admin/encounters")
+def admin_deidentified_encounters(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    u=Depends(require("global_admin"))
+):
+    """Global admin de-identified encounter feed. STRICTLY DE-IDENTIFIED: Patient name and contact are NEVER returned."""
+    q = db.query(models.Encounter)
+    total = q.count()
+    encs = q.order_by(models.Encounter.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    pt_map = {p.id: p for p in db.query(models.Patient).filter(models.Patient.id.in_([e.patient_id for e in encs])).all()}
+
+    items = []
+    for e in encs:
+        p = pt_map.get(e.patient_id)
+        items.append({
+            "id": e.id,
+            "encounterIdentifier": e.encounter_identifier,
+            "patientIdentifier": p.patient_identifier if p else "UNKNOWN",
+            "hospitalId": e.hospital_id,
+            "age": p.age if p else None,
+            "sex": p.sex if p else None,
+            "sexLabel": ("Female" if p.sex == 0 else ("Male" if p.sex == 1 else "Other")) if p else None,
+            "symptoms": json.loads(e.symptoms) if e.symptoms else [],
+            "symptomDurationDays": e.symptom_duration_days,
+            "vitals": json.loads(e.vitals) if e.vitals else {},
+            "structuredEcgFinding": e.structured_ecg_finding,
+            "optionalLabs": json.loads(e.optional_labs) if e.optional_labs else {},
+            "modelVersion": e.model_version,
+            "predictedTop3": json.loads(e.predicted_top3) if e.predicted_top3 else [],
+            "doctorConfirmedDiagnosis": e.doctor_confirmed_diagnosis,
+            "trainable": bool(e.trainable),
+            "createdAt": e.created_at.isoformat() if e.created_at else None,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": max(1, -(-total // page_size)),
+    }

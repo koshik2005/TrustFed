@@ -196,3 +196,67 @@ export interface NavItem {
   roles: UserRole[];
   badge?: number;
 }
+
+// ── Clinical Encounters & General Disease Types ──────────────────────────────
+export interface ClinicalSymptom {
+  code: string;
+  label: string;
+}
+
+export interface DiseaseProbability {
+  code?: string;
+  disease: string;
+  probability: number;
+}
+
+export interface ClinicalVitals {
+  temp_c?: number;
+  bp_sys?: number;
+  bp_dia?: number;
+  hr?: number;
+  spo2?: number;
+  resp_rate?: number;
+  blood_sugar?: number;
+}
+
+export interface ClinicalPatient {
+  id: number;
+  patientIdentifier: string;
+  hospitalId: string;
+  name?: string | null;
+  contact?: string | null;
+  age: number;
+  sex: number;
+  sexLabel: string;
+  weight?: number | null;
+  height?: number | null;
+  encounterCount?: number;
+  lastEncounterDate?: string | null;
+  lastEncounterId?: number | null;
+  createdAt?: string | null;
+}
+
+export interface ClinicalEncounter {
+  id: number;
+  encounterIdentifier: string;
+  patientId: number;
+  hospitalId: string;
+  symptoms: string[];
+  symptomDurationDays: number;
+  vitals: ClinicalVitals;
+  structuredEcgFinding?: string | null;
+  optionalLabs?: Record<string, any>;
+  modelVersion?: string;
+  predictedTop3: DiseaseProbability[];
+  doctorConfirmedDiagnosis?: string | null;
+  cause?: string | null;
+  treatment?: string | null;
+  confirmedBy?: number | null;
+  confirmedByName?: string | null;
+  confirmedAt?: string | null;
+  trainable: boolean;
+  status: 'pending' | 'confirmed';
+  createdAt?: string | null;
+  patient?: ClinicalPatient;
+}
+

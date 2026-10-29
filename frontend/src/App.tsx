@@ -22,6 +22,14 @@ const RegionalHubsPage   = lazy(() => import('@/pages/admin/RegionalHubsPage'));
 const ComparisonPage     = lazy(() => import('@/pages/comparison/ComparisonPage'));
 const AuditPage          = lazy(() => import('@/pages/audit/AuditPage'));
 const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
+
+// Phase 3: Clinical Patient & Doctor Confirmation Pages
+const PatientListPage          = lazy(() => import('@/pages/clinical/PatientListPage'));
+const NewPatientEncounterPage = lazy(() => import('@/pages/clinical/NewPatientEncounterPage'));
+const PatientDetailPage        = lazy(() => import('@/pages/clinical/PatientDetailPage'));
+const EncounterDetailPage      = lazy(() => import('@/pages/clinical/EncounterDetailPage'));
+const PendingConfirmationsPage = lazy(() => import('@/pages/clinical/PendingConfirmationsPage'));
+
 import ForcePasswordResetModal from '@/components/auth/ForcePasswordResetModal';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -69,6 +77,48 @@ export default function App() {
               element={
                 <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'regional_admin', 'global_admin']}>
                   <HospitalDashboard />
+                </RoleRoute>
+              }
+            />
+
+            {/* Phase 3: Clinical Encounters & Doctor Confirmation Workflow */}
+            <Route
+              path="patients"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'global_admin']}>
+                  <PatientListPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="patients/new"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'global_admin']}>
+                  <NewPatientEncounterPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="patients/:id"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'global_admin']}>
+                  <PatientDetailPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="encounters/:id"
+              element={
+                <RoleRoute allowedRoles={['hospital_staff', 'doctor', 'global_admin']}>
+                  <EncounterDetailPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="doctor/pending"
+              element={
+                <RoleRoute allowedRoles={['doctor', 'global_admin']}>
+                  <PendingConfirmationsPage />
                 </RoleRoute>
               }
             />

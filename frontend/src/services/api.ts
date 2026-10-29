@@ -3,7 +3,8 @@ import type {
   TrainingSession, RoundMetric, PredictionResult,
   PatientVitals, FairnessReport, PrivacyReport,
   AuditEntry, PaginatedResponse, Hospital, User,
-  RegionalHub, RegionalHospital
+  RegionalHub, RegionalHospital, ClinicalSymptom,
+  ClinicalVitals, ClinicalPatient, ClinicalEncounter
 } from '../types';
 import {
   MOCK_HOSPITALS, MOCK_SESSION, MOCK_METRICS,
@@ -350,6 +351,71 @@ export const regionalHospitalsApi = {
   },
 };
 
+// ── Phase 3: Clinical Patient & Doctor Confirmation API ───────────────────────
+export const clinicalApi = {
+  getSymptoms: async (): Promise<{ symptoms: ClinicalSymptom[]; ecgFindings: string[] }> => {
+    const res = await apiClient.get('/clinical/symptoms');
+    return res.data;
+  },
+
+  registerPatient: async (payload: {
+    name?: string;
+    contact?: string;
+    age: number;
+    sex: number | string;
+    weight?: number;
+    height?: number;
+    symptoms?: string[];
+    symptom_duration_days?: number;
+    vitals?: ClinicalVitals;
+    structured_ecg_finding?: string;
+    optional_labs?: Record<string, any>;
+  }): Promise<{ patient: ClinicalPatient; encounter: ClinicalEncounter | null }> => {
+    const res = await apiClient.post('/hospital/patients', payload);
+    return res.data;
+  },
+
+  listPatients: async (params?: { search?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<ClinicalPatient>> => {
+    const res = await apiClient.get<PaginatedResponse<ClinicalPatient>>('/hospital/patients', { params });
+    return res.data;
+  },
+
+  getPatientDetail: async (id: number): Promise<{ patient: ClinicalPatient; encounters: ClinicalEncounter[] }> => {
+    const res = await apiClient.get(`/hospital/patients/${id}`);
+    return res.data;
+  },
+
+  createEncounter: async (patientId: number, payload: {
+    symptoms: string[];
+    symptom_duration_days?: number;
+    vitals?: ClinicalVitals;
+    structured_ecg_finding?: string;
+    optional_labs?: Record<string, any>;
+  }): Promise<ClinicalEncounter> => {
+    const res = await apiClient.post(`/hospital/patients/${patientId}/encounters`, payload);
+    return res.data;
+  },
+
+  listEncounters: async (params?: { status?: string; search?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<ClinicalEncounter>> => {
+    const res = await apiClient.get<PaginatedResponse<ClinicalEncounter>>('/hospital/encounters', { params });
+    return res.data;
+  },
+
+  getEncounterDetail: async (encounterId: number): Promise<ClinicalEncounter> => {
+    const res = await apiClient.get<ClinicalEncounter>(`/hospital/encounters/${encounterId}`);
+    return res.data;
+  },
+
+  confirmEncounter: async (encounterId: number, payload: {
+    confirmed_diagnosis: string;
+    cause: string;
+    treatment: string;
+  }): Promise<ClinicalEncounter> => {
+    const res = await apiClient.post<ClinicalEncounter>(`/hospital/encounters/${encounterId}/confirm`, payload);
+    return res.data;
+  },
+};
+
 export const api = {
   authApi,
   trainingApi,
@@ -358,4 +424,5 @@ export const api = {
   auditApi,
   hubsApi,
   regionalHospitalsApi,
+  clinicalApi,
 };
