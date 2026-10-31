@@ -11,6 +11,15 @@ def _make_engine():
     """Try Supabase first, fall back to local SQLite."""
     if SUPABASE_DB_URL and (SUPABASE_DB_URL.startswith("postgresql") or SUPABASE_DB_URL.startswith("postgres")):
         db_url = SUPABASE_DB_URL.strip()
+
+        # Direct Supabase URLs (db.[ref].supabase.co) resolve to IPv6 only, which fails on Render (IPv4 only).
+        # Seamlessly rewrite direct Supabase host to IPv4 pooler endpoint
+        if "@db.eyicbgtknkfgajnfgqmz.supabase.co" in db_url:
+            db_url = db_url.replace(
+                "postgres:zSTAbazbTUXHx3OQ@db.eyicbgtknkfgajnfgqmz.supabase.co:5432",
+                "postgres.eyicbgtknkfgajnfgqmz:zSTAbazbTUXHx3OQ@aws-0-ap-northeast-2.pooler.supabase.com:5432"
+            )
+
         # In SQLAlchemy 2.0+, 'postgresql://' defaults to psycopg v3 ('psycopg').
         # If psycopg v3 is not installed, rewrite prefix to psycopg2 so psycopg2-binary works seamlessly.
         try:
