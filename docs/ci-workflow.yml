@@ -1,0 +1,123 @@
+name: TrustFed CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend Security, Audit & Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install -r backend/requirements.txt
+          pip install pytest anyio pip-audit
+
+      - name: Dependency Audit (pip-audit)
+        run: |
+          pip-audit
+
+      - name: Run Pytest Suite
+        env:
+          SECRET_KEY: "ci-secret-key-production-ready-test-2026"
+          ENVIRONMENT: "development"
+          ALLOW_DEMO_USERS: "true"
+        run: |
+          python -m pytest backend/tests/ -v
+
+  frontend:
+    name: Frontend Audit, Vitest & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Dependency Audit (npm audit)
+        run: npm audit --audit-level=high
+
+      - name: Frontend Vitest Suite
+        run: npm test -- --run
+
+      - name: Build Production Bundle
+        run: npm run build
+
+  e2e:
+    name: Playwright End-to-End Suite
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install -r backend/requirements.txt uvicorn
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies & Playwright Browsers
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start Backend Server
+        env:
+          SECRET_KEY: "ci-e2e-secret-key-trustfed-2026"
+          ENVIRONMENT: "development"
+          ALLOW_DEMO_USERS: "true"
+        run: |
+          python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+          sleep 4
+
+      - name: Start Frontend Server & Run Playwright
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: "http://127.0.0.1:5173"
+          VITE_API_URL: "http://127.0.0.1:8000"
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5173 &
+          sleep 4
+          npx playwright test

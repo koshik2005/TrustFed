@@ -115,3 +115,37 @@ npm run dev
   - Configuration blueprint: [`render.yaml`](render.yaml)
   - Auto-configured environment variables: `CORS_ORIGINS`, `ENVIRONMENT=production`, `SECRET_KEY`.
 
+---
+
+## India's Digital Personal Data Protection (DPDP) Act 2023 Considerations
+
+> [!WARNING]
+> **COMPLIANCE DISCLAIMER**: The architectural patterns and privacy controls described below are technical mechanisms designed to assist healthcare institutions in evaluating readiness against the principles of India's Digital Personal Data Protection Act, 2023 (DPDP Act 2023). **TrustFed does NOT claim formal certification, regulatory approval, or statutory compliance.** Achieving legal compliance under the DPDP Act 2023 requires legal counsel review, institutional data governance frameworks, Data Protection Officer (DPO) appointments, formal Consent Manager registrations, and operational safeguards outside the scope of software alone.
+
+### Technical Alignment Architecture
+
+1. **Classification of Roles (Section 2(i) & 2(k))**:
+   - **Data Fiduciary**: Each participating hospital node acts as the Data Fiduciary determining the purpose and means of clinical patient data collection and intake.
+   - **Data Processor**: The regional aggregation coordinators and global consortium servers act strictly as Data Processors, receiving only differentially private mathematical gradient summaries (`w_i`), never raw digital personal data.
+
+2. **Notice and Consent Mechanism (Section 6)**:
+   - Patient intake and federated model contribution require explicit, itemized institutional and clinical consent records stored in the `consent_records` ledger (`POST /api/v1/consent/manage`).
+   - Consent can be granted or revoked at any time. Revocation immediately disables participation in subsequent federated learning rounds.
+
+3. **Purpose Limitation & Data Minimization (Section 7)**:
+   - Identifiable patient data (name, contact details) is strictly isolated within the local hospital boundary and encrypted at rest with AES-256-GCM.
+   - Only non-identifiable, calibrated symptom vectors and model updates leave the hospital; raw records and patient identities never leave the local node.
+
+4. **Right to Correction and Erasure (Section 12)**:
+   - TrustFed provides an automated Right to Erasure endpoint (`DELETE /api/v1/hospital/patients/{patient_id}`).
+   - Exercising erasure permanently deletes the patient's demographics, unlinks encounters, purges local consent tokens, and appends a tamper-evident event to the SHA-256 hash-chained audit ledger.
+
+5. **Storage Limitation & Automated Retention Purge (Section 8(7))**:
+   - The platform includes configurable data retention controls (`POST /api/v1/data-retention/prune`) enabling hospitals to automatically purge unconfirmed draft clinical encounters older than a configured threshold (default: 90 days) and remove revoked consent artifacts.
+
+6. **Reasonable Security Safeguards (Section 8(5))**:
+   - **At Rest**: AES-256-GCM symmetric encryption for patient names and contact numbers.
+   - **In Transit**: Mandatory TLS 1.3, Strict Transport Security (`HSTS max-age=31536000`), Content Security Policy (`CSP`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`.
+   - **Mathematical Privacy**: Differential Privacy via DP-SGD ($(\epsilon, \delta)$-differential privacy with Rényi Differential Privacy accountant) with Gaussian perturbation and $L_2$ norm gradient clipping.
+   - **Accountability**: Hash-chained tamper-evident audit ledger preserving an immutable, verifiable trail of all access, consent modifications, model promotions, and data deletions.
+

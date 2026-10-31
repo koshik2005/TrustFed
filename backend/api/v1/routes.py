@@ -111,6 +111,19 @@ class ResetPasswordBody(BaseModel):
     new_password: str
 
 
+class ConsentManageBody(BaseModel):
+    hospital_id: str
+    patient_id: Optional[int] = None
+    consent_type: str = "FEDERATED_TRAINING_DEIDENTIFIED"
+    status: str = "granted"
+
+
+class DataRetentionPruneBody(BaseModel):
+    hospital_id: Optional[str] = None
+    days_unconfirmed: int = 90
+    purge_revoked_consent: bool = False
+
+
 def _user_json(u: models.User) -> Dict[str, Any]:
     return {
         "id": str(u.id),
@@ -1427,6 +1440,49 @@ def get_hospital_patient_detail(
     }
 
 
+@router.delete("/hospital/patients/{patient_id}")
+def delete_hospital_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    u=Depends(require(*CLINICAL_ROLES))
+):
+    """Right to Erasure (DPDP Act 2023 / HIPAA): Permanently deletes patient demographics and associated clinical records."""
+    patient = db.query(models.Patient).filter_by(id=patient_id).first()
+    if not patient:
+        raise HTTPException(404, "Patient not found")
+
+    if u.role in ("hospital_staff", "doctor") and patient.hospital_id != u.hospital_id:
+        raise HTTPException(403, "Access forbidden: Patient record belongs to another hospital node")
+
+    hid = patient.hospital_id
+    pt_ident = patient.patient_identifier
+
+    # Delete associated encounters
+    encounters = db.query(models.Encounter).filter_by(patient_id=patient.id).all()
+    deleted_encounters_count = len(encounters)
+    for enc in encounters:
+        db.delete(enc)
+
+    # Delete consent records for this patient
+    db.query(models.ConsentRecord).filter_by(patient_id=patient.id).delete()
+
+    # Delete patient
+    db.delete(patient)
+    db.commit()
+
+    store.add_audit(
+        db, None, u.email, "erasure",
+        f"Right to Erasure exercised: Patient identifier {pt_ident} and {deleted_encounters_count} encounters permanently deleted from node {hid} by {u.email} ({u.role})"
+    )
+
+    return {
+        "status": "success",
+        "message": f"Patient record {pt_ident} and all associated encounters permanently deleted.",
+        "deletedEncountersCount": deleted_encounters_count,
+        "hospitalId": hid
+    }
+
+
 @router.post("/hospital/patients/{patient_id}/encounters")
 def create_patient_encounter(
     patient_id: int,
@@ -2042,5 +2098,128 @@ def get_global_dashboard(
     - Aggregates consortium hubs, global model versions, federated rounds, audit ledger, and privacy.
     """
     return dashboard_service.get_global_dashboard_data(db)
+
+
+# ── Phase 7: Consent Management & Automated Data Retention Controls ───────────
+
+@router.post("/consent/manage")
+def manage_consent(
+    body: ConsentManageBody,
+    db: Session = Depends(get_db),
+    u=Depends(require("hospital_staff", "doctor", "global_admin"))
+):
+    """Fine-grained Institutional and Patient Consent Management (DPDP Act 2023 / HIPAA)."""
+    if u.role in ("hospital_staff", "doctor") and u.hospital_id != body.hospital_id:
+        raise HTTPException(403, "Access forbidden: cannot manage consent for another hospital node")
+
+    hospital = db.query(models.Hospital).filter_by(id=body.hospital_id).first()
+    if not hospital:
+        raise HTTPException(404, f"Hospital '{body.hospital_id}' not found")
+
+    status = "granted" if body.status.lower() in ("granted", "true", "active", "1") else "revoked"
+
+    # Query or create consent record
+    q = db.query(models.ConsentRecord).filter_by(
+        hospital_id=body.hospital_id,
+        consent_type=body.consent_type
+    )
+    if body.patient_id:
+        q = q.filter_by(patient_id=body.patient_id)
+    else:
+        q = q.filter(models.ConsentRecord.patient_id.is_(None))
+
+    consent = q.first()
+    now_dt = datetime.datetime.now(datetime.timezone.utc)
+    if consent:
+        consent.status = status
+        if status == "revoked":
+            consent.revoked_at = now_dt
+        else:
+            consent.revoked_at = None
+            consent.granted_at = now_dt
+    else:
+        consent = models.ConsentRecord(
+            hospital_id=body.hospital_id,
+            patient_id=body.patient_id,
+            consent_type=body.consent_type,
+            status=status,
+            granted_at=now_dt if status == "granted" else None,
+            revoked_at=now_dt if status == "revoked" else None,
+        )
+        db.add(consent)
+
+    if body.consent_type == "FEDERATED_TRAINING_DEIDENTIFIED" and not body.patient_id:
+        hospital.share_deidentified = (status == "granted")
+        hospital.consent_recorded_by = u.email
+
+    db.commit()
+
+    store.add_audit(
+        db, None, u.email, "consent",
+        f"Consent {status} for {body.consent_type} on node {body.hospital_id} by {u.email}"
+    )
+
+    return {
+        "status": "success",
+        "hospitalId": body.hospital_id,
+        "patientId": body.patient_id,
+        "consentType": body.consent_type,
+        "consentStatus": status,
+        "shareDeidentified": bool(hospital.share_deidentified)
+    }
+
+
+@router.post("/data-retention/prune")
+def prune_retained_data(
+    body: DataRetentionPruneBody,
+    db: Session = Depends(get_db),
+    u=Depends(require("hospital_staff", "doctor", "global_admin"))
+):
+    """Automated Storage Limitation and Data Retention Purge (DPDP Act 2023 / HIPAA)."""
+    target_hid = body.hospital_id
+    if u.role in ("hospital_staff", "doctor"):
+        if target_hid and target_hid != u.hospital_id:
+            raise HTTPException(403, "Access forbidden: cannot prune data for another hospital")
+        target_hid = u.hospital_id
+
+    cutoff_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=max(1, body.days_unconfirmed))
+
+    q = db.query(models.Encounter).filter(
+        models.Encounter.doctor_confirmed_diagnosis.is_(None),
+        models.Encounter.created_at < cutoff_date
+    )
+    if target_hid:
+        q = q.filter(models.Encounter.hospital_id == target_hid)
+
+    stale_encs = q.all()
+    pruned_count = len(stale_encs)
+    for enc in stale_encs:
+        db.delete(enc)
+
+    revoked_consent_pruned = 0
+    if body.purge_revoked_consent:
+        cq = db.query(models.ConsentRecord).filter(
+            models.ConsentRecord.status == "revoked",
+            models.ConsentRecord.revoked_at < cutoff_date
+        )
+        if target_hid:
+            cq = cq.filter(models.ConsentRecord.hospital_id == target_hid)
+        revoked_consent_pruned = cq.delete()
+
+    db.commit()
+
+    store.add_audit(
+        db, None, u.email, "data_retention",
+        f"Data retention policy executed: pruned {pruned_count} unconfirmed encounters older than {body.days_unconfirmed} days (node: {target_hid or 'all'})"
+    )
+
+    return {
+        "status": "success",
+        "hospitalId": target_hid or "all",
+        "retentionDays": body.days_unconfirmed,
+        "unconfirmedEncountersPruned": pruned_count,
+        "revokedConsentRecordsPruned": revoked_consent_pruned
+    }
+
 
 

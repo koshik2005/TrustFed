@@ -69,6 +69,14 @@ def _get_cors_origins() -> list[str]:
     ]
 
 
+from fastapi.middleware.gzip import GZipMiddleware
+from core.logging_config import init_monitoring_and_logging
+
+# Initialize structured logging with PHI redaction and Sentry error monitoring
+init_monitoring_and_logging()
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_cors_origins(),
@@ -85,9 +93,22 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://trustfed-backend.onrender.com https://frontend-3qgo.vercel.app; "
+        "frame-ancestors 'none';"
+    )
     env = os.getenv("ENVIRONMENT", "development").strip().lower()
-    if env in ("production", "prod") or bool(os.getenv("RENDER")):
+    if env in ("production", "prod") or bool(os.getenv("RENDER")) or request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    
+    # Enforce no-cache on sensitive API responses
+    if request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
     return response
 
 
@@ -107,6 +128,8 @@ def root():
 @app.head("/health")
 @app.get("/api/health")
 @app.head("/api/health")
+@app.get("/api/v1/health")
+@app.head("/api/v1/health")
 def health(db: Session = Depends(get_db)):
     db_status = "connected"
     try:
