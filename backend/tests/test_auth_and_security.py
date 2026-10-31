@@ -242,10 +242,12 @@ def test_validate_encryption_key_startup_check():
 
     old_env = os.environ.get("ENVIRONMENT")
     old_key = os.environ.get("PATIENT_ENCRYPTION_KEY")
+    old_demo = os.environ.get("ALLOW_DEMO_USERS")
     try:
         os.environ["ENVIRONMENT"] = "production"
+        os.environ["ALLOW_DEMO_USERS"] = "false"
         
-        # 1. Missing key in production must raise RuntimeError
+        # 1. Missing key in strict production must raise RuntimeError
         os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
         with pytest.raises(RuntimeError) as exc_missing:
             validate_encryption_key_on_startup()
@@ -262,8 +264,14 @@ def test_validate_encryption_key_startup_check():
         os.environ["PATIENT_ENCRYPTION_KEY"] = valid_key
         validate_encryption_key_on_startup()  # Should not raise
 
-        # 4. In development, missing key is allowed
+        # 4. In demo mode on Render without key set, logs warning without fatal crash
+        os.environ["ALLOW_DEMO_USERS"] = "true"
+        os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
+        validate_encryption_key_on_startup()  # Should not raise in demo mode
+
+        # 5. In development, missing key is allowed
         os.environ["ENVIRONMENT"] = "development"
+        os.environ["ALLOW_DEMO_USERS"] = "false"
         os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
         validate_encryption_key_on_startup()  # Should not raise
     finally:
@@ -271,6 +279,8 @@ def test_validate_encryption_key_startup_check():
         else: os.environ.pop("ENVIRONMENT", None)
         if old_key: os.environ["PATIENT_ENCRYPTION_KEY"] = old_key
         else: os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
+        if old_demo: os.environ["ALLOW_DEMO_USERS"] = old_demo
+        else: os.environ.pop("ALLOW_DEMO_USERS", None)
 
 
 
