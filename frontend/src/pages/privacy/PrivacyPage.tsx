@@ -92,7 +92,7 @@ export default function PrivacyPage() {
           <CardContent className="p-6">
             <div className="text-[12px] uppercase tracking-wider font-semibold text-slate-600 mb-2">Encryption Strength</div>
             <div className="font-mono text-[36px] font-bold text-blue-500 leading-none mb-2">{report?.paillierEnabled ? `${heKeySize}-bit` : 'Off'}</div>
-            <div className="text-slate-500 text-[12px]">Paillier Homomorphic Encryption</div>
+            <div className="text-slate-500 text-[12px]">Paillier HE (Research Simulation in backend/tefl/secagg.py)</div>
           </CardContent>
         </Card>
 

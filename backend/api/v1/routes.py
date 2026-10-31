@@ -1,8 +1,9 @@
 import datetime
 import json
 import os
+import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, Cookie
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -194,14 +195,50 @@ def cascade_hub_suspension(db: Session, hub_id: str, action: str = "suspend"):
     db.commit()
 
 
+ACCOUNT_FAILED_ATTEMPTS: Dict[str, List[float]] = {}
+ACCOUNT_LOCKOUT_MAX_ATTEMPTS = 5
+ACCOUNT_LOCKOUT_WINDOW_SECONDS = 300  # 5 minutes
+
+
+def check_account_throttle(email: str) -> None:
+    now = time.time()
+    attempts = [t for t in ACCOUNT_FAILED_ATTEMPTS.get(email, []) if now - t < ACCOUNT_LOCKOUT_WINDOW_SECONDS]
+    ACCOUNT_FAILED_ATTEMPTS[email] = attempts
+    if len(attempts) >= ACCOUNT_LOCKOUT_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed login attempts for account '{email}'. Account temporarily locked. Please try again later."
+        )
+
+
+def record_account_failed_attempt(email: str) -> None:
+    now = time.time()
+    attempts = [t for t in ACCOUNT_FAILED_ATTEMPTS.get(email, []) if now - t < ACCOUNT_LOCKOUT_WINDOW_SECONDS]
+    attempts.append(now)
+    ACCOUNT_FAILED_ATTEMPTS[email] = attempts
+
+
+def clear_account_failed_attempts(email: str) -> None:
+    ACCOUNT_FAILED_ATTEMPTS.pop(email, None)
+
+
 @router.post("/auth/login")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def login(request: Request, body: LoginBody, response: Response, db: Session = Depends(get_db)):
     client_ip = get_client_ip(request)
-    u = db.query(models.User).filter_by(email=body.email.strip().lower()).first()
+    norm_email = body.email.strip().lower()
+
+    # Per-account lockout check
+    check_account_throttle(norm_email)
+
+    u = db.query(models.User).filter_by(email=norm_email).first()
     if not u or not auth.verify_password(body.password, u.password_hash):
-        store.add_audit(db, None, client_ip, "auth", f"Failed login attempt for {body.email[:60]}")
+        record_account_failed_attempt(norm_email)
+        store.add_audit(db, None, client_ip, "auth", f"Failed login attempt for {norm_email[:60]}")
         raise HTTPException(401, "Invalid email or password")
+
+    # Clear account failures upon valid credentials
+    clear_account_failed_attempts(norm_email)
 
     if u.status and u.status != "active":
         store.add_audit(db, None, u.email, "auth", f"Login rejected: user account is {u.status}")
@@ -1914,11 +1951,12 @@ def rollback_model(
 @router.get("/regional/hubs/{hub_id}/deidentified-records")
 def regional_deidentified_records(
     hub_id: str,
+    k: int = Query(5, ge=1, description="Minimum demographic group size (k-anonymity threshold)"),
     db: Session = Depends(get_db),
     u: models.User = Depends(require("regional_admin", "global_admin"))
 ):
     """Returns strictly de-identified records from consenting hospitals within a regional hub.
-    Enforces Safe Harbor allow-list serializer (no names, contacts, exact DOBs, patient IDs).
+    Enforces Safe Harbor allow-list serializer and k-anonymity group suppression.
     """
     if u.role == "regional_admin":
         if u.hub_id != hub_id:
@@ -1928,7 +1966,7 @@ def regional_deidentified_records(
     if not hub:
         raise HTTPException(404, f"Regional hub '{hub_id}' not found")
 
-    res = federated_learning.get_regional_deidentified_records(hub_id, db, user=u)
+    res = federated_learning.get_regional_deidentified_records(hub_id, db, user=u, k=k)
     return res
 
 

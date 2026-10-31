@@ -550,16 +550,23 @@ def test_optional_deidentified_sharing_consent_guard():
         hosp1 = db.query(models.Hospital).filter_by(id="hosp-fl-1").first()
         assert hosp1.share_deidentified is False
 
-        # Access Hub A: contains hosp-fl-1 (no consent) and hosp-fl-2 (has consent)
-        hub_a_records = federated_learning.get_regional_deidentified_records("hub-fl-a", db)
+        # Access Hub A with k=1: contains hosp-fl-1 (no consent) and hosp-fl-2 (has consent)
+        hub_a_records = federated_learning.get_regional_deidentified_records("hub-fl-a", db, k=1)
         assert "hosp-fl-1" not in hub_a_records["consentingHospitals"]
         assert "hosp-fl-2" in hub_a_records["consentingHospitals"]
         assert hub_a_records["totalRecords"] >= 10
+        assert hub_a_records["rawRecordsCount"] >= 10
 
         # All returned records pass allow-list serializer
         for rec in hub_a_records["records"]:
             assert set(rec.keys()) == federated_learning.ALLOWED_DEIDENTIFIED_KEYS
             assert "name" not in rec and "contact" not in rec
+
+        # Verify k-anonymity suppression: when k=5, smaller demographic groups are suppressed
+        hub_a_k5 = federated_learning.get_regional_deidentified_records("hub-fl-a", db, k=5)
+        assert hub_a_k5["kThreshold"] == 5
+        assert hub_a_k5["suppressedRecordsCount"] > 0
+        assert hub_a_k5["rawRecordsCount"] == hub_a_records["rawRecordsCount"]
 
         # Tenancy test: Regional Admin B cannot access Hub A
         token_reg_b = _login("fl_reg_b_admin@trustfed.ai")

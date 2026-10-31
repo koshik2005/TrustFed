@@ -214,9 +214,9 @@ Direct patient identifying information (Name and Contact details) is encrypted a
 
 ## 6. Fernet Symmetric Key Lifecycle & Disaster Recovery Plan
 
-### 6.1. Key Storage
-- **Primary Source**: Injected via the `PATIENT_ENCRYPTION_KEY` environment variable as a 32-byte URL-safe base64 string.
-- **Key Derivation Fallback**: If not directly specified, derived using `PBKDF2HMAC` (SHA-256, 100,000 iterations, static salt) from `JWT_SECRET` or `SECRET_KEY`.
+### 6.1. Key Generation and Storage
+- **Primary Source**: Injected via the `PATIENT_ENCRYPTION_KEY` environment variable as a randomly generated 32-byte URL-safe base64 string (`Fernet.generate_key()`). No static salt derivation is used.
+- **Dynamic Fallback**: If not specified in non-production environments, a fresh random key is generated using `Fernet.generate_key()`.
 - **Infrastructure Security**: In production environments (e.g. Render, AWS, Kubernetes), the key must be stored in a dedicated secrets manager (AWS Secrets Manager, HashiCorp Vault, or encrypted environment secrets) and never committed to source control.
 
 ### 6.2. Key Rotation Procedure
@@ -226,10 +226,10 @@ Direct patient identifying information (Name and Contact details) is encrypted a
 3. **Phase 2 (Database Re-Encryption Migration)**: Execute an administrative re-encryption script that iterates through `patients` rows, calling `MultiFernet.rotate(token)` to re-encrypt old ciphertext under the new key.
 4. **Phase 3 (Deprecation)**: Once all records in the database are re-encrypted under $F_{\text{new}}$, decommission $F_{\text{old}}$ from environment configurations.
 
-### 6.3. Disaster Recovery Plan
+### 6.3. Disaster Recovery Plan (*Status: Planned, Not Implemented*)
+- **Implementation Status: Planned, not implemented.** Automated secret backup, key escrow, and disaster recovery orchestration are design targets, not yet deployed.
 - **Loss of Key**: Fernet encryption employs authenticated symmetric encryption (AES-128-CBC + HMAC-SHA256). **If the key is lost and has no backup, encrypted PHI cannot be recovered** (cryptographic erasure).
-- **Backup Policy**: The base64 key must be backed up in an encrypted, air-gapped institutional vault (or hardware security module HSM) accessible only by designated institutional Key Custodians.
-- **RTO / RPO**: Key restoration can be executed in under 5 minutes by updating the cloud environment secret and restarting the backend worker service.
+- **Target Specification**: The base64 key must be backed up in an encrypted, air-gapped institutional vault (or hardware security module HSM) accessible only by designated institutional Key Custodians.
 
 ---
 

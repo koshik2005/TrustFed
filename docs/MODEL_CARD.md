@@ -92,3 +92,11 @@ The model is bound by deterministic clinical safety guardrails ([red_flags.py](f
 1. **Synthetic & Clean Baseline Cohort**: The baseline pre-training supplement was generated from validated medical phenotype distributions. Real-world emergency room presentations involve complex polypharmacy, multi-morbidity, and inconsistent patient histories.
 2. **Ambulatory vs Emergency Triage**: Model weights represent initial clinical triage likelihoods and must never replace diagnostic investigations (cultures, imaging, ECG).
 3. **Mandatory Clinician Verification**: All suggested causes and remedies are labeled: *"Suggested, clinician must verify."*
+
+---
+
+## 7. Dataset Origin, Per-Disease Sample Distribution, and Prototype Benchmark Status
+
+- **Dataset Origin**: Pre-training baseline draws from public UCI Machine Learning repository datasets (Cleveland Heart Disease, Dermatology condition profiles) combined with a clearly labeled synthetic clinical supplement ($N=1,080$ total encounters: 864 training / 216 held-out test) generated based on clinical distributions in `backend/data/generate_clinical_supplement.py` and documented in `docs/DATASETS.md`.
+- **Per-Disease Sample Distribution**: Total dataset comprises $N=1,080$ encounters (60 cases per disease class across the 18 conditions: 48 training / 12 test support per class).
+- **Prototype Benchmark Status**: This system is an algorithmic decision-support **prototype benchmark, NOT a clinically validated medical device**. All metrics reported are prototype benchmark figures; real-world clinical accuracy on diverse uncurated hospital cohorts will be lower. All recommendations must be confirmed by a licensed clinician before any clinical action.

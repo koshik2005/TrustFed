@@ -519,10 +519,18 @@ def evaluate_and_promote_gate(
 
     rejections: List[str] = []
 
+    # Compute per-disease deltas and macro-F1 delta
+    per_disease_deltas: Dict[str, float] = {}
+    for disease, curr_f1 in curr_eval["perDiseaseF1"].items():
+        cand_f1 = cand_eval["perDiseaseF1"].get(disease, 0.0)
+        per_disease_deltas[disease] = round(float(cand_f1 - curr_f1), 4)
+
+    macro_f1_delta = round(float(cand_eval["macroF1"] - curr_eval["macroF1"]), 4)
+
     # Criterion A: Overall Macro-F1
     if cand_eval["macroF1"] < curr_eval["macroF1"] - 0.001:
         rejections.append(
-            f"Overall Macro-F1 dropped from {curr_eval['macroF1']:.3f} to {cand_eval['macroF1']:.3f}."
+            f"Overall Macro-F1 dropped from {curr_eval['macroF1']:.3f} to {cand_eval['macroF1']:.3f} (delta {macro_f1_delta:+.4f})."
         )
 
     # Criterion B: Per-disease regression check
@@ -558,6 +566,8 @@ def evaluate_and_promote_gate(
             "rejections": rejections,
             "currentMetrics": curr_eval,
             "candidateMetrics": cand_eval,
+            "macroF1Delta": macro_f1_delta,
+            "perDiseaseDeltas": per_disease_deltas,
             "modelVersion": current_model.version
         }
 
@@ -619,8 +629,11 @@ def evaluate_and_promote_gate(
         "diverged": False,
         "modelVersion": new_version,
         "previousVersion": current_model.version,
-        "currentMetrics": curr_eval,
-        "promotedMetrics": cand_eval,
+        "macroF1Delta": macro_f1_delta,
+        "perDiseaseDeltas": per_disease_deltas,
+        "baselineMetrics": curr_eval,
+        "candidateMetrics": cand_eval,
+        "reason": f"Promoted: Macro-F1 delta {macro_f1_delta:+.4f}, per-disease constraints satisfied.",
         "modelPath": checkpoint_path
     }
 
@@ -658,10 +671,22 @@ def rollback_global_model(target_version: str, db: Session) -> Dict[str, Any]:
     if not mv:
         raise ValueError(f"Target model version '{target_version}' not found in registry.")
 
-    if not mv.model_path or not os.path.exists(mv.model_path):
+    resolved_path = None
+    if mv.model_path and os.path.exists(mv.model_path):
+        resolved_path = mv.model_path
+    elif mv.model_path:
+        cand1 = os.path.join(ARTIFACT_DIR, os.path.basename(mv.model_path))
+        cand2 = os.path.join(ARTIFACT_DIR, f"{target_version}.npz")
+        cand3 = os.path.join(os.path.dirname(ARTIFACT_DIR), mv.model_path)
+        for cand in [cand1, cand2, cand3]:
+            if os.path.exists(cand):
+                resolved_path = cand
+                break
+
+    if not resolved_path:
         raise FileNotFoundError(f"Model checkpoint for '{target_version}' is missing on disk.")
 
-    data = np.load(mv.model_path)
+    data = np.load(resolved_path)
     W = data["W"]
     b = data["b"]
 
@@ -749,7 +774,8 @@ def serialize_deidentified_record(
 def get_regional_deidentified_records(
     hub_id: str,
     db: Session,
-    user: Optional[models.User] = None
+    user: Optional[models.User] = None,
+    k: int = 5
 ) -> Dict[str, Any]:
     """Returns de-identified clinical records for consenting hospitals within a regional hub.
     
@@ -758,9 +784,12 @@ def get_regional_deidentified_records(
     - Requires both hospital.share_deidentified == True AND an active ConsentRecord.
     - Non-consenting hospitals return zero records.
     - All output is passed through the allow-list serializer.
+    - Enforces k-anonymity minimum group size: demographic groups with size < k are suppressed.
     """
+    from collections import Counter
+
     hospitals = db.query(models.Hospital).filter_by(hub_id=hub_id).all()
-    records: List[Dict[str, Any]] = []
+    raw_records: List[Dict[str, Any]] = []
     consenting_hospitals = []
     non_consenting_hospitals = []
 
@@ -792,24 +821,42 @@ def get_regional_deidentified_records(
                     rec = serialize_deidentified_record(pt, enc)
                     # Verify allow-list invariants
                     assert "name" not in rec and "contact" not in rec and "patient_identifier" not in rec
-                    records.append(rec)
+                    raw_records.append(rec)
         else:
             non_consenting_hospitals.append(hosp.id)
+
+    # Enforce minimum group size k (k-anonymity across demographic groups)
+    group_counts = Counter(
+        (r.get("age_band"), r.get("sex"), r.get("confirmed_diagnosis"))
+        for r in raw_records
+    )
+
+    filtered_records: List[Dict[str, Any]] = []
+    suppressed_count = 0
+    for r in raw_records:
+        grp = (r.get("age_band"), r.get("sex"), r.get("confirmed_diagnosis"))
+        if group_counts[grp] >= k:
+            filtered_records.append(r)
+        else:
+            suppressed_count += 1
 
     store.add_audit(
         db,
         session_id=None,
         node_id=hub_id,
         event_type="deidentified_sharing_accessed",
-        description=f"Regional hub '{hub_id}' accessed {len(records)} de-identified records from {len(consenting_hospitals)} consenting hospitals."
+        description=f"Regional hub '{hub_id}' accessed {len(filtered_records)} de-identified records (k={k}, {suppressed_count} suppressed) from {len(consenting_hospitals)} consenting hospitals."
     )
 
     return {
         "hubId": hub_id,
-        "totalRecords": len(records),
+        "kThreshold": k,
+        "totalRecords": len(filtered_records),
+        "rawRecordsCount": len(raw_records),
+        "suppressedRecordsCount": suppressed_count,
         "consentingHospitals": consenting_hospitals,
         "nonConsentingHospitals": non_consenting_hospitals,
-        "records": records
+        "records": filtered_records
     }
 
 
@@ -940,8 +987,12 @@ def run_hierarchical_federated_round(
         return {
             "sessionId": session_id,
             "status": "aborted",
+            "promoted": False,
+            "modelVersion": current_model.version,
             "reason": "No eligible hospitals available.",
-            "eligibility": eligibility_reports
+            "eligibility": eligibility_reports,
+            "eligibilityReports": eligibility_reports,
+            "regionalModels": []
         }
 
     # Step 3: Regional tier aggregation
@@ -955,8 +1006,12 @@ def run_hierarchical_federated_round(
         return {
             "sessionId": session_id,
             "status": "aborted",
+            "promoted": False,
+            "modelVersion": current_model.version,
             "reason": "No regional hub updates formed.",
-            "eligibility": eligibility_reports
+            "eligibility": eligibility_reports,
+            "eligibilityReports": eligibility_reports,
+            "regionalModels": []
         }
 
     # Step 4: Global tier aggregation
@@ -965,8 +1020,12 @@ def run_hierarchical_federated_round(
         return {
             "sessionId": session_id,
             "status": "aborted",
+            "promoted": False,
+            "modelVersion": current_model.version,
             "reason": "Global candidate aggregation failed.",
-            "eligibility": eligibility_reports
+            "eligibility": eligibility_reports,
+            "eligibilityReports": eligibility_reports,
+            "regionalModels": []
         }
 
     # Step 5: Promotion gate evaluation
@@ -982,9 +1041,29 @@ def run_hierarchical_federated_round(
         target_epsilon=config.get("target_epsilon")
     )
 
+    regional_models_summary = [
+        {
+            "hubId": reg["hubId"],
+            "participatingHospitals": reg["participatingHospitals"],
+            "totalSamples": reg["totalSamples"]
+        }
+        for reg in regional_updates
+    ]
+
+    is_promoted = bool(gate_res.get("promoted", False))
+    active_version = gate_res.get("newVersion") or gate_res.get("modelVersion") or current_model.version
+
     return {
         "sessionId": session_id,
-        "status": "promoted" if gate_res["promoted"] else ("rejected" if not gate_res.get("diverged") else "diverged"),
+        "status": "promoted" if is_promoted else ("rejected" if not gate_res.get("diverged") else "diverged"),
+        "promoted": is_promoted,
+        "modelVersion": active_version,
+        "reason": gate_res.get("reason", "Evaluation complete"),
+        "macroF1Delta": gate_res.get("macroF1Delta", 0.0),
+        "perDiseaseDeltas": gate_res.get("perDiseaseDeltas", {}),
+        "candidateMetrics": gate_res.get("candidateMetrics") or gate_res.get("metrics"),
+        "baselineMetrics": gate_res.get("baselineMetrics"),
+        "regionalModels": regional_models_summary,
         "gateResult": gate_res,
         "privacy": privacy,
         "participatingHospitals": [u["hospitalId"] for u in hospital_updates],

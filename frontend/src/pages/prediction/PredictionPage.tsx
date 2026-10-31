@@ -361,8 +361,10 @@ export default function PredictionPage() {
             )}
 
             {/* Disclaimer */}
-            <div className="text-[11px] text-slate-400 text-center italic">
-              {result.disclaimer}
+            <div className="text-[11px] text-slate-500 text-center bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+              <span className="font-semibold text-slate-700">Prototype Decision Support: </span>
+              {result.disclaimer || "Clinical decision support only, not a diagnostic verdict."}
+              <span className="block text-[10px] text-slate-400 mt-0.5">Trained on public and synthetic benchmark data (N=1,080). Prototype benchmark results are not a clinical validation.</span>
             </div>
           </div>
         )}

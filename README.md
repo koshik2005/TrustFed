@@ -27,7 +27,7 @@ graph TD
     subgraph Regional_Tier ["Regional Aggregator Tier (Hubs)"]
         RH1["East Coast Regional Hub"]
         RH2["West Coast Regional Hub"]
-        SMPC["Homomorphic Paillier & SMPC Aggregator"]
+        SMPC["Homomorphic Paillier & SMPC Aggregator (Research Module)"]
     end
 
     subgraph Hospital_Tier ["Hospital Edge Tier (Clinical Nodes)"]
@@ -45,7 +45,7 @@ graph TD
     RH2 -->|Aggregated Model Weights| PV
     PV -->|Promote if Macro-F1 Imparts Gain| GM
     
-    RH1 <-->|Paillier Homomorphic Sum| SMPC
+    RH1 <-->|Algorithmic Simulation Only| SMPC
     RH1 -->|Distribute Round Config| H1
     RH1 -->|Distribute Round Config| H2
     RH2 -->|Distribute Round Config| H3
@@ -55,19 +55,19 @@ graph TD
     H3 -->|Differentially-Private Gradients Only| RH2
 
     DOC -->|Trainable Confirmed Records Only| DP1
-    ENC -.->|Zero Egress: Never Leaves Hospital| H1
+    ENC -.->|No direct patient identifiers leave hospital| H1
 ```
 
 ---
 
 ## 2. Data Flow: What Leaves Each Tier
 
-Privacy by design is mathematically guaranteed. Direct patient identifiers **never leave the hospital's local database under any circumstances**.
+No direct patient identifiers leave the hospital under any circumstances. Raw patient names, phone numbers, and contacts remain strictly isolated.
 
 | Operational Tier | What Enters | What Stays Isolated Inside | What Leaves | Destination |
 | :--- | :--- | :--- | :--- | :--- |
 | **Hospital Node** | Global model parameters ($W, b$), symptom vocabulary, clinical intake. | **Patient Name, Phone, Email** (encrypted at rest via AES-128 Fernet), raw symptoms, vitals, unstructured notes, patient IDs (`PT-XXXX`). | **Only clipped, differentially private weight updates** ($\Delta W_i, \Delta b_i$) and masked model contribution metrics. | Regional Hub |
-| **Regional Hub** | Local hospital gradient updates ($\Delta W_i$), training eligibility flags. | Hospital-specific update shares prior to SMPC completion, jurisdictional access tokens. | **Regionally aggregated model weights** ($\overline{W}_{\text{reg}}$) and regional Macro-F1 / accuracy metrics. *(Note: Live web REST tier executes FedAvg over DP-perturbed updates; packed Paillier HE is implemented in `backend/tefl/secagg.py`).* | Global Coordinator |
+| **Regional Hub** | Local hospital gradient updates ($\Delta W_i$), training eligibility flags. | Hospital-specific update shares prior to SMPC completion, jurisdictional access tokens. | **Regionally aggregated model weights** ($\overline{W}_{\text{reg}}$) and regional Macro-F1 / accuracy metrics. *(Note: Live web REST tier executes FedAvg over DP-perturbed updates; packed Paillier HE is an algorithmic research simulation module implemented in `backend/tefl/secagg.py`).* | Global Coordinator |
 | **Global Coordinator** | Regional model weights ($\overline{W}_{\text{reg}}$). | Held-out validation cohort ($N=216$, Macro-F1: 0.572, Top-3: 86.1%), cryptographic audit verification proofs. | **Signed candidate global model release** ($W_{\text{global}}$) and broadcast rollback instructions. | All Regional Hubs & Hospitals |
 
 ---

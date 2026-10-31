@@ -17,26 +17,29 @@ _KEY_CACHE: Optional[bytes] = None
 
 
 def get_phi_encryption_key() -> bytes:
-    """Derive a URL-safe base64-encoded 32-byte key for Fernet symmetric encryption."""
+    """Return a 32-byte URL-safe base64-encoded key for Fernet symmetric encryption.
+    
+    If PATIENT_ENCRYPTION_KEY is provided in the environment, it is used directly.
+    Otherwise, a cryptographically secure random key is generated using Fernet.generate_key()
+    (purely random bytes, no derivation with static salt).
+    """
     global _KEY_CACHE
     if _KEY_CACHE is not None:
         return _KEY_CACHE
 
-    raw_secret = os.getenv("PATIENT_ENCRYPTION_KEY") or os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
-    if not raw_secret:
-        # Default dev key with deterministic salt
-        raw_secret = "trustfed-phi-master-key-change-in-prod-2026"
+    env_key = os.getenv("PATIENT_ENCRYPTION_KEY")
+    if env_key and env_key.strip():
+        key_bytes = env_key.strip().encode("utf-8")
+        try:
+            # Verify valid Fernet key
+            Fernet(key_bytes)
+            _KEY_CACHE = key_bytes
+            return _KEY_CACHE
+        except Exception:
+            pass
 
-    # Derive 32 bytes using PBKDF2HMAC
-    salt = b"trustfed_phi_static_salt_v1"
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100_000,
-    )
-    derived = kdf.derive(raw_secret.encode())
-    _KEY_CACHE = base64.urlsafe_b64encode(derived)
+    # Randomly generated Fernet key (pure random entropy, no static salt)
+    _KEY_CACHE = Fernet.generate_key()
     return _KEY_CACHE
 
 

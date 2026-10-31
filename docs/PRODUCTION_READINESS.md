@@ -105,9 +105,9 @@ alt-svc: h3=":443"; ma=86400
 ## 5. Cryptographic Keys, Tenancy Governance & Limitations
 
 ### 5.1. Fernet Key Lifecycle & Recovery
-- **Storage**: Injected as `PATIENT_ENCRYPTION_KEY` environment secret on Render. Derived with `PBKDF2HMAC-SHA256` (100,000 iterations, static salt) if derived from master secret.
+- **Storage**: Injected as `PATIENT_ENCRYPTION_KEY` environment secret on Render as a randomly generated 32-byte key (`Fernet.generate_key()`). No static salt derivation is used.
 - **Rotation**: Supported via Python `cryptography.fernet.MultiFernet([new_key, old_key])` with database re-encryption (`rotate(token)`).
-- **Disaster Recovery**: Cryptographic erasure occurs if the secret is unbacked. Recovery plan requires secure storage in an air-gapped institutional vault with RTO $< 5$ minutes via environment variable re-injection.
+- **Disaster Recovery (*Planned, Not Implemented*)**: Automated secret backup, key escrow, and disaster recovery orchestration are design targets and currently marked **planned, not implemented**. Cryptographic erasure occurs if the secret is unbacked. Target plan requires secure storage in an air-gapped institutional vault with RTO $< 5$ minutes via environment variable re-injection.
 
 ### 5.2. Paillier Key Authority vs Regional Hub Visibility
 - **Key Authority**: In the theoretical/research cryptosystem (`backend/tefl/secagg.py`), the Paillier private key $(\lambda, \mu)$ is held by an independent Key Authority; hubs only see additive shares, and the global aggregator only sums ciphertexts ($g=n+1$).

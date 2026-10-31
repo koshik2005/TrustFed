@@ -11,7 +11,7 @@ import os
 import datetime
 from sqlalchemy.orm import Session
 from db import models
-from services import auth, crypto
+from services import auth, crypto, general_disease_model
 
 DISEASES = [
     {
@@ -78,15 +78,13 @@ DEMO_USERS = [
 ]
 
 SYNTHETIC_PATIENTS = [
+    # ── Hospital 1 (hub-east) 8 confirmed encounters ─────────────────────────
     {
-        "identifier": "PT-GEN-001",
+        "identifier": "PT-GEN-101",
         "hospital_id": "1",
         "name": "Johnathan Doe (Synthetic)",
         "contact": "+1-555-0192 / j.doe.synthetic@test.org",
-        "age": 34,
-        "sex": 1,
-        "weight": 76.5,
-        "height": 178.0,
+        "age": 34, "sex": 1, "weight": 76.5, "height": 178.0,
         "encounter": {
             "symptoms": ["high_fever", "retro_orbital_pain", "severe_arthralgia", "nausea"],
             "duration": 4,
@@ -97,21 +95,18 @@ SYNTHETIC_PATIENTS = [
                 {"disease": "Acute Viral Pyrexia", "probability": 0.14},
                 {"disease": "Typhoid Enteric Fever", "probability": 0.04}
             ],
-            "diagnosis": "DENGUE",
+            "diagnosis": "dengue",
             "cause": "Aedes aegypti vector transmission with secondary viremia",
             "treatment": "Strict oral rehydration, paracetamol 650mg SOS, platelet monitoring daily. Avoid NSAIDs.",
             "trainable": True
         }
     },
     {
-        "identifier": "PT-GEN-002",
+        "identifier": "PT-GEN-102",
         "hospital_id": "1",
         "name": "Maria Gonzales (Synthetic)",
         "contact": "+1-555-0144 / m.gonzales.synthetic@test.org",
-        "age": 28,
-        "sex": 0,
-        "weight": 61.0,
-        "height": 164.0,
+        "age": 28, "sex": 0, "weight": 61.0, "height": 164.0,
         "encounter": {
             "symptoms": ["dysuria", "urinary_frequency", "suprapubic_tenderness", "low_grade_fever"],
             "duration": 2,
@@ -122,21 +117,18 @@ SYNTHETIC_PATIENTS = [
                 {"disease": "Acute Viral Pyrexia", "probability": 0.08},
                 {"disease": "Common Cold", "probability": 0.02}
             ],
-            "diagnosis": "UTI",
+            "diagnosis": "uti",
             "cause": "Ascending uropathogenic E. coli infection",
             "treatment": "Nitrofurantoin 100mg PO BID for 5 days, hydration > 2.5L/day.",
             "trainable": True
         }
     },
     {
-        "identifier": "PT-GEN-003",
+        "identifier": "PT-GEN-103",
         "hospital_id": "1",
         "name": "David Sterling (Synthetic)",
         "contact": "+1-555-0188 / d.sterling.synthetic@test.org",
-        "age": 62,
-        "sex": 1,
-        "weight": 84.0,
-        "height": 175.0,
+        "age": 62, "sex": 1, "weight": 84.0, "height": 175.0,
         "encounter": {
             "symptoms": ["exertional_angina", "substernal_chest_pressure", "shortness_of_breath"],
             "duration": 7,
@@ -148,21 +140,127 @@ SYNTHETIC_PATIENTS = [
                 {"disease": "Hypertension", "probability": 0.06},
                 {"disease": "Acute Viral Pyrexia", "probability": 0.01}
             ],
-            "diagnosis": "CARDIAC_CAD",
+            "diagnosis": "heart_disease",
             "cause": "Atherosclerotic coronary artery disease with exertional ischemia",
             "treatment": "Aspirin 81mg, Atorvastatin 40mg, Metoprolol 25mg, Urgent Cardiology Angiography referral.",
             "trainable": True
         }
     },
     {
-        "identifier": "PT-GEN-004",
+        "identifier": "PT-GEN-104",
+        "hospital_id": "1",
+        "name": "Marcus Aurel (Synthetic)",
+        "contact": "+1-555-0155 / m.aurel.synthetic@test.org",
+        "age": 45, "sex": 1, "weight": 80.0, "height": 176.0,
+        "encounter": {
+            "symptoms": ["high_fever", "severe_myalgia", "chills", "dry_cough", "headache"],
+            "duration": 2,
+            "vitals": {"bp_sys": 126, "bp_dia": 82, "hr": 90, "temp_c": 39.0, "spo2": 98, "resp_rate": 18},
+            "labs": {"rapid_influenza_a": "positive"},
+            "predicted_top3": [
+                {"disease": "Influenza (Seasonal Flu)", "probability": 0.88},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.08},
+                {"disease": "Common Cold", "probability": 0.04}
+            ],
+            "diagnosis": "influenza",
+            "cause": "Influenza A seasonal virus transmission",
+            "treatment": "Oseltamivir 75mg PO BID x 5 days, rest and antipyretics.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-105",
+        "hospital_id": "1",
+        "name": "Chloe Bennett (Synthetic)",
+        "contact": "+1-555-0156 / c.bennett.synthetic@test.org",
+        "age": 23, "sex": 0, "weight": 56.0, "height": 162.0,
+        "encounter": {
+            "symptoms": ["runny_nose", "sneezing", "sore_throat", "mild_cough"],
+            "duration": 3,
+            "vitals": {"bp_sys": 112, "bp_dia": 70, "hr": 74, "temp_c": 37.1, "spo2": 99, "resp_rate": 14},
+            "predicted_top3": [
+                {"disease": "Common Cold", "probability": 0.86},
+                {"disease": "Allergic Rhinitis", "probability": 0.10},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.04}
+            ],
+            "diagnosis": "common_cold",
+            "cause": "Rhinovirus upper respiratory viral infection",
+            "treatment": "Warm saline gargle, steam inhalation, hydration, cetirizine 10mg PRN.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-106",
+        "hospital_id": "1",
+        "name": "Evelyn Reed (Synthetic)",
+        "contact": "+1-555-0157 / e.reed.synthetic@test.org",
+        "age": 52, "sex": 0, "weight": 78.0, "height": 160.0,
+        "encounter": {
+            "symptoms": ["polyuria", "polydipsia", "fatigue", "blurred_vision"],
+            "duration": 30,
+            "vitals": {"bp_sys": 134, "bp_dia": 86, "hr": 80, "temp_c": 36.7, "spo2": 98, "resp_rate": 16},
+            "labs": {"fasting_glucose": 182, "hba1c": 8.4},
+            "predicted_top3": [
+                {"disease": "Type 2 Diabetes Mellitus", "probability": 0.91},
+                {"disease": "Essential Hypertension", "probability": 0.06},
+                {"disease": "Urinary Tract Infection", "probability": 0.03}
+            ],
+            "diagnosis": "type2_diabetes",
+            "cause": "Insulin resistance with beta-cell dysfunction",
+            "treatment": "Metformin 500mg PO BID, diabetic lifestyle and dietary counseling.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-107",
+        "hospital_id": "1",
+        "name": "Arthur Pendelton (Synthetic)",
+        "contact": "+1-555-0158 / a.pendelton.synthetic@test.org",
+        "age": 58, "sex": 1, "weight": 88.0, "height": 174.0,
+        "encounter": {
+            "symptoms": ["occipital_headache", "dizziness", "tinnitus"],
+            "duration": 14,
+            "vitals": {"bp_sys": 164, "bp_dia": 102, "hr": 84, "temp_c": 36.6, "spo2": 97, "resp_rate": 16},
+            "predicted_top3": [
+                {"disease": "Essential Hypertension", "probability": 0.89},
+                {"disease": "Coronary Artery Disease (CAD)", "probability": 0.08},
+                {"disease": "Migraine", "probability": 0.03}
+            ],
+            "diagnosis": "hypertension",
+            "cause": "Primary essential systemic hypertension",
+            "treatment": "Amlodipine 5mg PO daily, sodium restriction (<2g/day), home BP diary.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-108",
+        "hospital_id": "1",
+        "name": "Liam Scott (Synthetic)",
+        "contact": "+1-555-0159 / l.scott.synthetic@test.org",
+        "age": 31, "sex": 1, "weight": 70.0, "height": 172.0,
+        "encounter": {
+            "symptoms": ["fever", "body_aches", "headache", "generalized_weakness"],
+            "duration": 3,
+            "vitals": {"bp_sys": 118, "bp_dia": 76, "hr": 86, "temp_c": 38.6, "spo2": 98, "resp_rate": 17},
+            "predicted_top3": [
+                {"disease": "Acute Viral Pyrexia", "probability": 0.82},
+                {"disease": "Common Cold", "probability": 0.11},
+                {"disease": "Dengue Fever", "probability": 0.07}
+            ],
+            "diagnosis": "viral_fever",
+            "cause": "Non-specific systemic viral infection",
+            "treatment": "Paracetamol 650mg PO TDS PRN, oral fluid replacement, rest.",
+            "trainable": True
+        }
+    },
+
+    # ── Hospital 2 (hub-east) 8 confirmed encounters ─────────────────────────
+    {
+        "identifier": "PT-GEN-201",
         "hospital_id": "2",
         "name": "Priya Sharma (Synthetic)",
         "contact": "+1-555-0112 / p.sharma.synthetic@test.org",
-        "age": 22,
-        "sex": 0,
-        "weight": 52.0,
-        "height": 160.0,
+        "age": 22, "sex": 0, "weight": 52.0, "height": 160.0,
         "encounter": {
             "symptoms": ["step_ladder_fever", "abdominal_pain", "constipation", "malaise"],
             "duration": 6,
@@ -173,34 +271,331 @@ SYNTHETIC_PATIENTS = [
                 {"disease": "Dengue Fever", "probability": 0.11},
                 {"disease": "Acute Viral Pyrexia", "probability": 0.04}
             ],
-            "diagnosis": "TYPHOID",
+            "diagnosis": "typhoid",
             "cause": "Salmonella enterica serovar Typhi food/water ingestion",
             "treatment": "Azithromycin 500mg PO daily for 7 days, strict dietary precautions.",
             "trainable": True
         }
     },
     {
-        "identifier": "PT-GEN-005",
+        "identifier": "PT-GEN-202",
         "hospital_id": "2",
         "name": "Robert Chen (Synthetic)",
         "contact": "+1-555-0177 / r.chen.synthetic@test.org",
-        "age": 45,
-        "sex": 1,
-        "weight": 78.0,
-        "height": 172.0,
+        "age": 38, "sex": 1, "weight": 74.0, "height": 172.0,
         "encounter": {
-            "symptoms": ["high_fever", "severe_myalgia", "chills", "dry_cough", "headache"],
+            "symptoms": ["watery_diarrhea", "abdominal_cramps", "nausea", "vomiting"],
             "duration": 2,
-            "vitals": {"bp_sys": 124, "bp_dia": 80, "hr": 92, "temp_c": 38.9, "spo2": 98, "resp_rate": 18},
-            "labs": {"rapid_influenza_a": "positive"},
+            "vitals": {"bp_sys": 110, "bp_dia": 72, "hr": 92, "temp_c": 37.9, "spo2": 98, "resp_rate": 18},
             "predicted_top3": [
-                {"disease": "Influenza (Seasonal Flu)", "probability": 0.87},
+                {"disease": "Acute Gastroenteritis", "probability": 0.87},
+                {"disease": "Typhoid Enteric Fever", "probability": 0.09},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.04}
+            ],
+            "diagnosis": "gastroenteritis",
+            "cause": "Acute viral/bacterial enteritis with dehydration",
+            "treatment": "ORS sachets with zinc supplementation, light bland diet.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-203",
+        "hospital_id": "2",
+        "name": "Fatima Zahra (Synthetic)",
+        "contact": "+1-555-0203 / f.zahra.synthetic@test.org",
+        "age": 49, "sex": 0, "weight": 65.0, "height": 158.0,
+        "encounter": {
+            "symptoms": ["wheezing", "shortness_of_breath", "chest_tightness", "dry_cough"],
+            "duration": 3,
+            "vitals": {"bp_sys": 128, "bp_dia": 82, "hr": 94, "temp_c": 36.9, "spo2": 94, "resp_rate": 22},
+            "predicted_top3": [
+                {"disease": "Bronchial Asthma Exacerbation", "probability": 0.85},
+                {"disease": "Acute Bronchitis", "probability": 0.11},
+                {"disease": "Community-Acquired Pneumonia", "probability": 0.04}
+            ],
+            "diagnosis": "asthma",
+            "cause": "Reactive airway hyper-responsiveness triggered by cold air",
+            "treatment": "Salbutamol + Budesonide MDI with spacer, prednisone taper.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-204",
+        "hospital_id": "2",
+        "name": "George Miller (Synthetic)",
+        "contact": "+1-555-0204 / g.miller.synthetic@test.org",
+        "age": 67, "sex": 1, "weight": 79.0, "height": 175.0,
+        "encounter": {
+            "symptoms": ["productive_cough", "fever", "pleuritic_chest_pain", "dyspnea"],
+            "duration": 5,
+            "vitals": {"bp_sys": 136, "bp_dia": 84, "hr": 98, "temp_c": 38.8, "spo2": 93, "resp_rate": 24},
+            "predicted_top3": [
+                {"disease": "Community-Acquired Pneumonia", "probability": 0.86},
+                {"disease": "Acute Bronchitis", "probability": 0.10},
+                {"disease": "COVID-19", "probability": 0.04}
+            ],
+            "diagnosis": "pneumonia",
+            "cause": "Streptococcus pneumoniae lower respiratory infection",
+            "treatment": "Amoxicillin-clavulanate 875/125mg PO BID x 7 days, oxygen therapy.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-205",
+        "hospital_id": "2",
+        "name": "Amina Khalfan (Synthetic)",
+        "contact": "+1-555-0205 / a.khalfan.synthetic@test.org",
+        "age": 29, "sex": 0, "weight": 54.0, "height": 162.0,
+        "encounter": {
+            "symptoms": ["pallor", "fatigue", "dizziness", "exertional_dyspnea"],
+            "duration": 60,
+            "vitals": {"bp_sys": 104, "bp_dia": 66, "hr": 88, "temp_c": 36.6, "spo2": 98, "resp_rate": 16},
+            "labs": {"hemoglobin": 8.9, "ferritin": 9.2},
+            "predicted_top3": [
+                {"disease": "Iron Deficiency / Nutritional Anemia", "probability": 0.90},
+                {"disease": "Essential Hypertension", "probability": 0.05},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.05}
+            ],
+            "diagnosis": "anemia",
+            "cause": "Nutritional iron deficiency with depleted iron stores",
+            "treatment": "Ferrous ascorbate 100mg elemental iron daily with Vitamin C.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-206",
+        "hospital_id": "2",
+        "name": "Sarah Jenkins (Synthetic)",
+        "contact": "+1-555-0206 / s.jenkins.synthetic@test.org",
+        "age": 35, "sex": 0, "weight": 60.0, "height": 165.0,
+        "encounter": {
+            "symptoms": ["unilateral_throbbing_headache", "photophobia", "phonophobia", "nausea"],
+            "duration": 1,
+            "vitals": {"bp_sys": 120, "bp_dia": 78, "hr": 78, "temp_c": 36.7, "spo2": 99, "resp_rate": 16},
+            "predicted_top3": [
+                {"disease": "Migraine / Vascular Cephalea", "probability": 0.88},
+                {"disease": "Essential Hypertension", "probability": 0.08},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.04}
+            ],
+            "diagnosis": "migraine",
+            "cause": "Neurovascular trigeminovascular activation",
+            "treatment": "Sumatriptan 50mg PO at aura onset, quiet dark room rest.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-207",
+        "hospital_id": "2",
+        "name": "Carlos Gomez (Synthetic)",
+        "contact": "+1-555-0207 / c.gomez.synthetic@test.org",
+        "age": 41, "sex": 1, "weight": 77.0, "height": 173.0,
+        "encounter": {
+            "symptoms": ["high_fever", "retro_orbital_pain", "myalgia", "petechial_rash"],
+            "duration": 4,
+            "vitals": {"bp_sys": 114, "bp_dia": 74, "hr": 94, "temp_c": 39.2, "spo2": 97, "resp_rate": 18},
+            "labs": {"platelets": 92, "wbc": 3.9},
+            "predicted_top3": [
+                {"disease": "Dengue Fever", "probability": 0.85},
+                {"disease": "Typhoid Enteric Fever", "probability": 0.09},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.06}
+            ],
+            "diagnosis": "dengue",
+            "cause": "Dengue virus infection via mosquito vector",
+            "treatment": "IV normal saline, paracetamol, close platelet count surveillance.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-208",
+        "hospital_id": "2",
+        "name": "Kevin Walsh (Synthetic)",
+        "contact": "+1-555-0208 / k.walsh.synthetic@test.org",
+        "age": 26, "sex": 1, "weight": 71.0, "height": 179.0,
+        "encounter": {
+            "symptoms": ["fever", "dry_cough", "anosmia", "fatigue", "sore_throat"],
+            "duration": 3,
+            "vitals": {"bp_sys": 122, "bp_dia": 78, "hr": 84, "temp_c": 38.4, "spo2": 96, "resp_rate": 18},
+            "labs": {"covid_antigen": "positive"},
+            "predicted_top3": [
+                {"disease": "COVID-19 / Acute Respiratory Illness", "probability": 0.87},
+                {"disease": "Influenza (Seasonal Flu)", "probability": 0.09},
+                {"disease": "Common Cold", "probability": 0.04}
+            ],
+            "diagnosis": "covid19",
+            "cause": "SARS-CoV-2 viral transmission",
+            "treatment": "Home isolation for 5 days, symptomatic antipyretics, SpO2 monitoring.",
+            "trainable": True
+        }
+    },
+
+    # ── Hospital 4 (hub-west) 8 confirmed encounters ─────────────────────────
+    {
+        "identifier": "PT-GEN-401",
+        "hospital_id": "4",
+        "name": "Richard Vance (Synthetic)",
+        "contact": "+1-555-0401 / r.vance.synthetic@test.org",
+        "age": 55, "sex": 1, "weight": 83.0, "height": 177.0,
+        "encounter": {
+            "symptoms": ["substernal_chest_pressure", "diaphoresis", "shortness_of_breath"],
+            "duration": 2,
+            "vitals": {"bp_sys": 150, "bp_dia": 94, "hr": 82, "temp_c": 36.8, "spo2": 96, "resp_rate": 18},
+            "predicted_top3": [
+                {"disease": "Coronary Artery Disease (CAD)", "probability": 0.91},
+                {"disease": "Essential Hypertension", "probability": 0.06},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.03}
+            ],
+            "diagnosis": "heart_disease",
+            "cause": "Myocardial ischemia from coronary arterial narrowing",
+            "treatment": "Nitroglycerin sublingual, dual antiplatelet therapy, urgent ECG.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-402",
+        "hospital_id": "4",
+        "name": "Hannah Abbott (Synthetic)",
+        "contact": "+1-555-0402 / h.abbott.synthetic@test.org",
+        "age": 33, "sex": 0, "weight": 58.0, "height": 163.0,
+        "encounter": {
+            "symptoms": ["dysuria", "urinary_frequency", "urgency", "suprapubic_tenderness"],
+            "duration": 3,
+            "vitals": {"bp_sys": 116, "bp_dia": 74, "hr": 80, "temp_c": 37.4, "spo2": 99, "resp_rate": 16},
+            "predicted_top3": [
+                {"disease": "Urinary Tract Infection", "probability": 0.90},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.06},
+                {"disease": "Acute Gastroenteritis", "probability": 0.04}
+            ],
+            "diagnosis": "uti",
+            "cause": "Lower urinary tract coliform infection",
+            "treatment": "Fosfomycin 3g single dose, copious hydration.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-403",
+        "hospital_id": "4",
+        "name": "Devon Harris (Synthetic)",
+        "contact": "+1-555-0403 / d.harris.synthetic@test.org",
+        "age": 27, "sex": 1, "weight": 72.0, "height": 175.0,
+        "encounter": {
+            "symptoms": ["fever", "chills", "profuse_sweating", "headache"],
+            "duration": 4,
+            "vitals": {"bp_sys": 118, "bp_dia": 72, "hr": 96, "temp_c": 39.5, "spo2": 98, "resp_rate": 19},
+            "labs": {"malaria_smear": "plasmodium_vivax_positive"},
+            "predicted_top3": [
+                {"disease": "Malaria", "probability": 0.86},
+                {"disease": "Dengue Fever", "probability": 0.09},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.05}
+            ],
+            "diagnosis": "malaria",
+            "cause": "Plasmodium vivax transmitted via Anopheles bite",
+            "treatment": "Chloroquine + Primaquine under G6PD enzyme screening.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-404",
+        "hospital_id": "4",
+        "name": "Lucy Lin (Synthetic)",
+        "contact": "+1-555-0404 / l.lin.synthetic@test.org",
+        "age": 42, "sex": 0, "weight": 62.0, "height": 166.0,
+        "encounter": {
+            "symptoms": ["clear_rhinorrhea", "sneezing", "nasal_pruritus", "watery_eyes"],
+            "duration": 14,
+            "vitals": {"bp_sys": 114, "bp_dia": 72, "hr": 72, "temp_c": 36.6, "spo2": 99, "resp_rate": 14},
+            "predicted_top3": [
+                {"disease": "Allergic Rhinitis (Hay Fever)", "probability": 0.88},
                 {"disease": "Common Cold", "probability": 0.08},
                 {"disease": "Acute Viral Pyrexia", "probability": 0.04}
             ],
-            "diagnosis": "FLU",
-            "cause": "Influenza A virus droplet transmission",
-            "treatment": "Oseltamivir 75mg PO BID for 5 days, rest and symptomatic antipyretics.",
+            "diagnosis": "allergic_rhinitis",
+            "cause": "Type I hypersensitivity to airborne pollen allergens",
+            "treatment": "Fluticasone nasal spray 1 puff daily, fexofenadine 120mg PO.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-405",
+        "hospital_id": "4",
+        "name": "Thomas O'Connor (Synthetic)",
+        "contact": "+1-555-0405 / t.oconnor.synthetic@test.org",
+        "age": 61, "sex": 1, "weight": 85.0, "height": 178.0,
+        "encounter": {
+            "symptoms": ["cough_with_sputum", "low_grade_fever", "chest_soreness", "fatigue"],
+            "duration": 7,
+            "vitals": {"bp_sys": 132, "bp_dia": 84, "hr": 84, "temp_c": 37.9, "spo2": 96, "resp_rate": 18},
+            "predicted_top3": [
+                {"disease": "Acute Bronchitis", "probability": 0.85},
+                {"disease": "Community-Acquired Pneumonia", "probability": 0.10},
+                {"disease": "Bronchial Asthma Exacerbation", "probability": 0.05}
+            ],
+            "diagnosis": "bronchitis",
+            "cause": "Inflammatory bronchial mucous membrane response",
+            "treatment": "Dextromethorphan syrup, hydration, warm humidified air.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-406",
+        "hospital_id": "4",
+        "name": "Nadia Patel (Synthetic)",
+        "contact": "+1-555-0406 / n.patel.synthetic@test.org",
+        "age": 50, "sex": 0, "weight": 68.0, "height": 161.0,
+        "encounter": {
+            "symptoms": ["elevated_bp", "headache", "lightheadedness"],
+            "duration": 10,
+            "vitals": {"bp_sys": 158, "bp_dia": 98, "hr": 82, "temp_c": 36.8, "spo2": 98, "resp_rate": 16},
+            "predicted_top3": [
+                {"disease": "Essential Hypertension", "probability": 0.88},
+                {"disease": "Coronary Artery Disease (CAD)", "probability": 0.08},
+                {"disease": "Type 2 Diabetes Mellitus", "probability": 0.04}
+            ],
+            "diagnosis": "hypertension",
+            "cause": "Sustained arterial vascular resistance elevation",
+            "treatment": "Telmisartan 40mg PO daily, dietary salt restriction, exercise.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-407",
+        "hospital_id": "4",
+        "name": "Brian Gallagher (Synthetic)",
+        "contact": "+1-555-0407 / b.gallagher.synthetic@test.org",
+        "age": 36, "sex": 1, "weight": 76.0, "height": 174.0,
+        "encounter": {
+            "symptoms": ["acute_pyrexia", "body_aches", "fatigue", "headache"],
+            "duration": 2,
+            "vitals": {"bp_sys": 120, "bp_dia": 78, "hr": 88, "temp_c": 38.7, "spo2": 98, "resp_rate": 17},
+            "predicted_top3": [
+                {"disease": "Acute Viral Pyrexia", "probability": 0.83},
+                {"disease": "Common Cold", "probability": 0.11},
+                {"disease": "Dengue Fever", "probability": 0.06}
+            ],
+            "diagnosis": "viral_fever",
+            "cause": "Seasonal acute systemic viral syndrome",
+            "treatment": "Oral fluids, paracetamol 650mg TDS, rest.",
+            "trainable": True
+        }
+    },
+    {
+        "identifier": "PT-GEN-408",
+        "hospital_id": "4",
+        "name": "Tara Fitzpatrick (Synthetic)",
+        "contact": "+1-555-0408 / t.fitzpatrick.synthetic@test.org",
+        "age": 24, "sex": 0, "weight": 55.0, "height": 164.0,
+        "encounter": {
+            "symptoms": ["prolonged_fever", "headache", "abdominal_pain", "malaise"],
+            "duration": 7,
+            "vitals": {"bp_sys": 110, "bp_dia": 68, "hr": 78, "temp_c": 39.0, "spo2": 98, "resp_rate": 18},
+            "labs": {"widal_test": "positive_1_160"},
+            "predicted_top3": [
+                {"disease": "Typhoid Enteric Fever", "probability": 0.85},
+                {"disease": "Acute Viral Pyrexia", "probability": 0.09},
+                {"disease": "Dengue Fever", "probability": 0.06}
+            ],
+            "diagnosis": "typhoid",
+            "cause": "Salmonella typhi enteric infection",
+            "treatment": "Cefixime 200mg PO BID for 10 days, boiled drinking water.",
             "trainable": True
         }
     }
@@ -318,7 +713,29 @@ def seed_synthetic_data(db: Session, force: bool = False):
     db.commit()
 
     # 6. Global & Regional Model Versions (Evaluated on Held-Out Test Cohort N=216)
+    artifact_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts")
+    os.makedirs(artifact_dir, exist_ok=True)
+
+    base_model = general_disease_model.get_model()
+    v1_path = os.path.join(artifact_dir, "TF-GenDisease-v1.0.npz")
+    v09_path = os.path.join(artifact_dir, "TF-GenDisease-v0.9.npz")
+    import numpy as np
+    if not os.path.exists(v1_path):
+        np.savez(v1_path, W=base_model.W, b=base_model.b)
+    if not os.path.exists(v09_path):
+        np.savez(v09_path, W=base_model.W * 0.98, b=base_model.b)
+
     models_to_seed = [
+        ("TF-GenDisease-v0.9", "global", None, "General Multi-Condition", {
+            "top3Accuracy": 0.840,
+            "top3_accuracy": 0.840,
+            "top1Accuracy": 0.585,
+            "accuracy": 0.585,
+            "macroF1": 0.548,
+            "macro_f1": 0.548,
+            "ece": 0.0980,
+            "split": "Held-out test cohort (N=216, 20% stratified split)"
+        }, "archived", v09_path),
         ("TF-GenDisease-v1.0", "global", None, "General Multi-Condition", {
             "top3Accuracy": 0.861,
             "top3_accuracy": 0.861,
@@ -328,20 +745,23 @@ def seed_synthetic_data(db: Session, force: bool = False):
             "macro_f1": 0.572,
             "ece": 0.0919,
             "split": "Held-out test cohort (N=216, 20% stratified split)"
-        }),
-        ("TF-HeartNet-v2", "global", None, "Cardiovascular Risk", {"accuracy": 0.883, "epsilon": 1.84, "auc": 0.915})
+        }, "active", v1_path),
+        ("TF-HeartNet-v2", "global", None, "Cardiovascular Risk", {"accuracy": 0.883, "epsilon": 1.84, "auc": 0.915}, "archived", os.path.join(artifact_dir, "pretrained_cleveland.npz"))
     ]
-    for ver, scope, sid, cat, metrics in models_to_seed:
-        if not db.query(models.ModelVersion).filter_by(version=ver).first():
+    for ver, scope, sid, cat, metrics, status, mpath in models_to_seed:
+        mv = db.query(models.ModelVersion).filter_by(version=ver).first()
+        if not mv:
             db.add(models.ModelVersion(
                 version=ver,
                 scope=scope,
                 scope_id=sid,
                 disease_category=cat,
                 metrics=json.dumps(metrics),
-                model_path=f"artifacts/{ver.lower()}.npz",
-                status="active"
+                model_path=mpath,
+                status=status
             ))
+        else:
+            mv.model_path = mpath
     db.commit()
 
     print("[INFO] Synthetic demo data successfully seeded (guarded and encrypted at rest).")

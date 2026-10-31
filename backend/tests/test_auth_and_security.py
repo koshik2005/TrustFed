@@ -196,6 +196,44 @@ def test_production_seed_guard():
             os.environ.pop("ALLOW_DEMO_USERS", None)
 
 
+def test_per_account_failed_login_throttling():
+    """Verify that repeated failed logins against a single account trigger HTTP 429 lockout."""
+    target_email = "target_account_throttle@trustfed.ai"
+    # Seed user
+    db = SessionLocal()
+    try:
+        u = db.query(models.User).filter_by(email=target_email).first()
+        if not u:
+            db.add(models.User(
+                email=target_email,
+                name="Throttled User",
+                role="hospital_staff",
+                hospital_id="hosp-bgh",
+                password_hash=auth.hash_password("ValidPassword123!")
+            ))
+            db.commit()
+    finally:
+        db.close()
+
+    # Attempt 5 incorrect passwords with varied client IPs (e.g. X-Forwarded-For)
+    for i in range(5):
+        resp = client.post(
+            "/api/auth/login",
+            json={"email": target_email, "password": f"WrongPass{i}!"},
+            headers={"X-Forwarded-For": f"198.51.100.{i+1}"}
+        )
+        assert resp.status_code in (401, 429)
+
+    # 6th attempt on this account must be locked out with HTTP 429 regardless of IP
+    lockout_resp = client.post(
+        "/api/auth/login",
+        json={"email": target_email, "password": "EvenCorrectOrWrongPass!"},
+        headers={"X-Forwarded-For": "203.0.113.99"}
+    )
+    assert lockout_resp.status_code == 429, f"Expected 429 Account Lockout, got {lockout_resp.status_code}"
+    assert "Too many failed login attempts for account" in lockout_resp.json()["detail"]
+
+
 if __name__ == "__main__":
     import time
     setup_module(sys.modules[__name__])
