@@ -67,3 +67,4 @@ def test_sentry_phi_scrubber_removes_identifiers():
 if __name__ == "__main__":
     test_sentry_phi_scrubber_removes_identifiers()
     print("Sentry PHI Scrubber test passed successfully!")
+
