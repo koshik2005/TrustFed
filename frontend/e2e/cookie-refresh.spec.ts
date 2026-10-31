@@ -85,7 +85,7 @@ test.describe('First-Party Refresh Cookie & Session Restoration', () => {
         hasToken: typeof data['token'] === 'string' && (data['token'] as string).length > 10,
         hasNewCsrf: typeof data['csrf_token'] === 'string',
       };
-    }, capturedCsrfToken as string);
+    }, capturedCsrfToken!);
 
     expect(refreshResult.status, `Expected HTTP 200 from /api/auth/refresh, got ${refreshResult.status}`).toBe(200);
     expect(refreshResult.ok).toBe(true);
