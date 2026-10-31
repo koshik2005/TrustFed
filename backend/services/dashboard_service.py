@@ -288,9 +288,11 @@ def get_regional_dashboard_data(db: Session, hub_id: str) -> Dict[str, Any]:
             {"disease": "uti", "displayName": "Urinary Tract Infection", "count": 12, "accuracy": 0.93},
         ]
 
-    # Regional model performance
+    # Regional model performance (Held-out test cohort N=216)
     active_mv = db.query(models.ModelVersion).filter_by(version=active_version).first()
-    active_metrics = json.loads(active_mv.metrics) if active_mv and active_mv.metrics else {"macroF1": 0.885, "accuracy": 0.892}
+    active_metrics = json.loads(active_mv.metrics) if active_mv and active_mv.metrics else {"macroF1": 0.572, "accuracy": 0.611, "top3Accuracy": 0.861}
+    macro_val = active_metrics.get("macroF1") or active_metrics.get("macro_f1", 0.572)
+    acc_val = active_metrics.get("accuracy") or active_metrics.get("top1Accuracy", 0.611)
 
     return {
         "hub": {
@@ -310,8 +312,9 @@ def get_regional_dashboard_data(db: Session, hub_id: str) -> Dict[str, Any]:
             "pendingEncounters": total_pending_encounters,
         },
         "regionalModelPerformance": {
-            "macroF1": active_metrics.get("macroF1", 0.885),
-            "accuracy": active_metrics.get("accuracy", 0.892),
+            "macroF1": macro_val,
+            "accuracy": acc_val,
+            "top3Accuracy": active_metrics.get("top3Accuracy", active_metrics.get("top3_accuracy", 0.861)),
             "activeVersion": active_version
         },
         "perDiseaseAccuracy": disease_accuracy_list
@@ -370,8 +373,9 @@ def get_global_dashboard_data(db: Session) -> Dict[str, Any]:
             "diseaseCategory": mv.disease_category,
             "status": mv.status,
             "isActive": is_active,
-            "macroF1": parsed_metrics.get("macroF1", 0.88),
-            "accuracy": parsed_metrics.get("accuracy", 0.89),
+            "macroF1": parsed_metrics.get("macroF1", parsed_metrics.get("macro_f1", 0.572)),
+            "accuracy": parsed_metrics.get("accuracy", parsed_metrics.get("top1Accuracy", 0.611)),
+            "top3Accuracy": parsed_metrics.get("top3Accuracy", parsed_metrics.get("top3_accuracy", 0.861)),
             "fairnessGap": parsed_metrics.get("fairnessGap", 0.034),
             "createdAt": mv.created_at.isoformat() if mv.created_at else None
         }
@@ -382,8 +386,9 @@ def get_global_dashboard_data(db: Session) -> Dict[str, Any]:
     if not active_model_meta:
         active_model_meta = {
             "version": active_version,
-            "macroF1": 0.885,
-            "accuracy": 0.892,
+            "macroF1": 0.572,
+            "accuracy": 0.611,
+            "top3Accuracy": 0.861,
             "fairnessGap": 0.034,
             "status": "active"
         }

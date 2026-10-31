@@ -1,7 +1,7 @@
 # TrustFed AI — Data Dictionary & Privacy Classification Specification
 
 **Version:** 2.0 (General Multi-Disease Federated Learning Platform)  
-**Classification Standard:** HIPAA Safe Harbor & GDPR Privacy-by-Design  
+**Classification Standard:** Privacy Design Considerations (Not a Compliance Claim)  
 **Date:** October 2026  
 
 ---
@@ -209,3 +209,50 @@ Direct patient identifying information (Name and Contact details) is encrypted a
 ### Decryption Governance
 - Decryption is **only** performed in response to authorized `GET /api/patients/{id}` requests initiated by an authenticated user with role `doctor` or `hospital_staff` whose `hospital_id` strictly matches the patient's `hospital_id`.
 - Regional Admins and Global Admins **never receive decrypted PHI**; endpoints exposed to those roles return solely aggregated metrics or de-identified encounters.
+
+---
+
+## 6. Fernet Symmetric Key Lifecycle & Disaster Recovery Plan
+
+### 6.1. Key Storage
+- **Primary Source**: Injected via the `PATIENT_ENCRYPTION_KEY` environment variable as a 32-byte URL-safe base64 string.
+- **Key Derivation Fallback**: If not directly specified, derived using `PBKDF2HMAC` (SHA-256, 100,000 iterations, static salt) from `JWT_SECRET` or `SECRET_KEY`.
+- **Infrastructure Security**: In production environments (e.g. Render, AWS, Kubernetes), the key must be stored in a dedicated secrets manager (AWS Secrets Manager, HashiCorp Vault, or encrypted environment secrets) and never committed to source control.
+
+### 6.2. Key Rotation Procedure
+1. TrustFed utilizes the Python `cryptography.fernet.MultiFernet` standard for zero-downtime key rotation:
+   $$\text{MultiFernet}([F_{\text{new}}, F_{\text{old}}])$$
+2. **Phase 1 (Dual-Key Deployment)**: Set `PATIENT_ENCRYPTION_KEY_NEW` alongside `PATIENT_ENCRYPTION_KEY_OLD`. Decryptions try the new key first, then fall back to the old key. All new patient encryptions use the new key.
+3. **Phase 2 (Database Re-Encryption Migration)**: Execute an administrative re-encryption script that iterates through `patients` rows, calling `MultiFernet.rotate(token)` to re-encrypt old ciphertext under the new key.
+4. **Phase 3 (Deprecation)**: Once all records in the database are re-encrypted under $F_{\text{new}}$, decommission $F_{\text{old}}$ from environment configurations.
+
+### 6.3. Disaster Recovery Plan
+- **Loss of Key**: Fernet encryption employs authenticated symmetric encryption (AES-128-CBC + HMAC-SHA256). **If the key is lost and has no backup, encrypted PHI cannot be recovered** (cryptographic erasure).
+- **Backup Policy**: The base64 key must be backed up in an encrypted, air-gapped institutional vault (or hardware security module HSM) accessible only by designated institutional Key Custodians.
+- **RTO / RPO**: Key restoration can be executed in under 5 minutes by updating the cloud environment secret and restarting the backend worker service.
+
+---
+
+## 7. Paillier Homomorphic Encryption & Aggregation Limitations
+
+### 7.1. Key Authority Architecture
+- In the theoretical and research architecture (`backend/tefl/secagg.py`):
+  - An independent **Key Authority** holds the private key $(\lambda, \mu)$.
+  - Regional hubs encrypt model updates using the public key $n$ ($g = n+1$ with packed 52-bit SIMD slots).
+  - The Global Aggregator server adds ciphertexts using homomorphic multiplication without possessing the private key.
+  - The Key Authority decrypts only the final summed aggregate vector, never seeing intermediate hospital updates.
+
+### 7.2. Production Web Tier Limitation (Honest Disclosure)
+- In the current live production web API service (`backend/services/federated_learning.py`):
+  - Hospital nodes train locally with Differential Privacy (DP-SGD: gradient clipping $C=1.0$, Gaussian noise $\sigma=1.2$).
+  - Hospital nodes submit these DP-perturbed weight updates $(W, b)$ to the Regional Hub API via TLS.
+  - **Limitation**: The Regional Hub server receives individual hospital weight vectors $(W, b)$ and computes weighted FedAvg. Therefore, the regional hub **can observe individual hospital weight updates** (which are protected by DP-SGD noise, but not encrypted with SMPC or Paillier ciphertext in the live REST tier).
+  - The packed Paillier encryption module is implemented in the algorithmic engine (`backend/tefl/secagg.py`), but live web API orchestration currently operates on DP-perturbed parameters directly. Full edge-to-edge SMPC/Paillier RPC integration across hospital agents remains a planned future infrastructure enhancement.
+
+---
+
+## 8. Optional De-Identified Record Sharing Governance
+
+- **Institutional Opt-In**: Disabled by default (`hospital.share_deidentified = False`).
+- **Allow-List Serializer**: Enforced strictly via `ALLOWED_DEIDENTIFIED_KEYS = {"age_band", "sex", "symptoms", "vitals", "confirmed_diagnosis", "cause", "treatment"}`. All names, contacts, MRNs, patient IDs, addresses, and exact DOBs are stripped.
+- **Allow-List Scope**: Sharing is restricted to consenting hospitals within the jurisdictional regional hub (`GET /api/v1/regional/hubs/{id}/deidentified-records`). Cross-consortium raw record pooling or third-party allow-lists are **not implemented** to prevent multi-center data concentration risks.

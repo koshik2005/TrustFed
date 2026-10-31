@@ -166,7 +166,7 @@ export default function GlobalAdminDashboard() {
             </Badge>
           </div>
           <p className="text-xs text-slate-500">
-            Multi-Tier Federated Governance · Macro-F1: <strong className="text-slate-700">{(currentModel?.macroF1 * 100).toFixed(1)}%</strong> · Global Accuracy: <strong className="text-slate-700">{(currentModel?.accuracy * 100).toFixed(1)}%</strong>
+            Multi-Tier Federated Governance · Held-Out Macro-F1: <strong className="text-slate-700">{(currentModel?.macroF1 * 100).toFixed(1)}%</strong> · Top-3 Differential: <strong className="text-slate-700">{((currentModel?.top3Accuracy ?? 0.861) * 100).toFixed(1)}%</strong> · Strict Top-1: <strong className="text-slate-700">{(currentModel?.accuracy * 100).toFixed(1)}%</strong> <span className="text-[11px] text-slate-400 font-mono">(Held-Out Test N=216)</span>
           </p>
         </div>
 
@@ -234,7 +234,7 @@ export default function GlobalAdminDashboard() {
               ε = {privacySummary?.actualEpsilon?.toFixed(2) || '2.85'}
             </div>
             <div className="text-xs text-slate-500 flex items-center justify-between">
-              <span>RDP certified (δ=1e-5)</span>
+              <span>RDP bound (δ=1e-5, C=1.0, σ=1.2)</span>
               <button onClick={() => navigate('/privacy')} className="text-cyan-700 hover:underline font-semibold flex items-center text-[11px]">
                 Report <ArrowRight className="w-3 h-3 ml-0.5" />
               </button>
@@ -492,7 +492,7 @@ export default function GlobalAdminDashboard() {
                       onChange={(e) => setRoundConfig({ ...roundConfig, target_epsilon: parseFloat(e.target.value) || 2.0 })}
                       className="h-9 text-xs"
                     />
-                    <span className="text-[10px] text-slate-500">Certified by RDP</span>
+                    <span className="text-[10px] text-slate-500">RDP bound (Sampled Gaussian)</span>
                   </div>
                 </div>
 

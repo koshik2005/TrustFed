@@ -24,7 +24,7 @@ export default function Forbidden403() {
         </span>
 
         <h1 className="text-xl font-bold text-slate-900 mb-2">
-          HIPAA Role Boundary Enforced
+          Tenancy Role Boundary Enforced
         </h1>
 
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">

@@ -67,8 +67,8 @@ Privacy by design is mathematically guaranteed. Direct patient identifiers **nev
 | Operational Tier | What Enters | What Stays Isolated Inside | What Leaves | Destination |
 | :--- | :--- | :--- | :--- | :--- |
 | **Hospital Node** | Global model parameters ($W, b$), symptom vocabulary, clinical intake. | **Patient Name, Phone, Email** (encrypted at rest via AES-128 Fernet), raw symptoms, vitals, unstructured notes, patient IDs (`PT-XXXX`). | **Only clipped, differentially private weight updates** ($\Delta W_i, \Delta b_i$) and masked model contribution metrics. | Regional Hub |
-| **Regional Hub** | Local hospital gradient updates ($\Delta W_i$), training eligibility flags. | Hospital-specific update shares prior to SMPC completion, jurisdictional access tokens. | **Homomorphically summed, regionally aggregated model weights** ($\overline{W}_{\text{reg}}$) and regional Macro-F1 / accuracy metrics. | Global Coordinator |
-| **Global Coordinator** | Regional model weights ($\overline{W}_{\text{reg}}$). | Held-out validation cohort ($N=216$), cryptographic audit verification proofs. | **Signed candidate global model release** ($W_{\text{global}}$) and broadcast rollback instructions. | All Regional Hubs & Hospitals |
+| **Regional Hub** | Local hospital gradient updates ($\Delta W_i$), training eligibility flags. | Hospital-specific update shares prior to SMPC completion, jurisdictional access tokens. | **Regionally aggregated model weights** ($\overline{W}_{\text{reg}}$) and regional Macro-F1 / accuracy metrics. *(Note: Live web REST tier executes FedAvg over DP-perturbed updates; packed Paillier HE is implemented in `backend/tefl/secagg.py`).* | Global Coordinator |
+| **Global Coordinator** | Regional model weights ($\overline{W}_{\text{reg}}$). | Held-out validation cohort ($N=216$, Macro-F1: 0.572, Top-3: 86.1%), cryptographic audit verification proofs. | **Signed candidate global model release** ($W_{\text{global}}$) and broadcast rollback instructions. | All Regional Hubs & Hospitals |
 
 ---
 
@@ -81,7 +81,7 @@ TrustFed enforces a four-tier access control matrix with strict object-level ten
 | **Patient Registration & Intake** | Full Access | Full Access | 403 Forbidden | Read-Only Audit | Scoped to user's `hospital_id` |
 | **Run Top-3 AI Differential** | Full Access | Full Access | 403 Forbidden | Full Access | Scoped to active model version |
 | **Doctor Review & Confirmation** | 403 Forbidden | **Full Access** | 403 Forbidden | Read-Only Audit | Only doctors can mark encounters trainable |
-| **Right to Erasure (DPDP)** | Full Access | Full Access | 403 Forbidden | Full Access | Permanent purge + hash-chained audit |
+| **Right to Erasure (Data Retention)** | Full Access | Full Access | 403 Forbidden | Full Access | Permanent purge + hash-chained audit |
 | **Hospital Dashboard** | Own Hospital | Own Hospital | 403 Forbidden | Any Hospital | Strict tenant check on `hospital_id` |
 | **Regional Hospital Management**| 403 Forbidden | 403 Forbidden | **Assigned Hub Only** | Full Consortium | Hardcoded filter on `user.hub_id` |
 | **Trigger Federated Round** | 403 Forbidden | 403 Forbidden | 403 Forbidden | **Full Access** | Global governance authorization |
@@ -216,10 +216,10 @@ TrustFed uses environment variables to configure operational mode, cryptography,
 
 ---
 
-## 8. India's DPDP Act 2023 Technical Alignment
+## 8. Data Privacy Technical Architecture (Design Considerations, Not a Compliance Claim)
 
 > [!WARNING]
-> **COMPLIANCE DISCLAIMER**: The architectural patterns and privacy controls described below are technical mechanisms designed to assist healthcare institutions in evaluating readiness against the principles of India's Digital Personal Data Protection Act, 2023 (DPDP Act 2023). **TrustFed does NOT claim formal certification, regulatory approval, or statutory compliance.** Achieving legal compliance under the DPDP Act 2023 requires legal counsel review, institutional data governance frameworks, Data Protection Officer (DPO) appointments, formal Consent Manager registrations, and operational safeguards outside the scope of software alone.
+> **STATUTORY DISCLAIMER**: The architectural patterns and privacy controls described below represent technical design considerations and engineering safeguards. **TrustFed does NOT claim formal certification, regulatory approval, or statutory compliance with HIPAA, GDPR, or India's DPDP Act 2023.** Achieving legal compliance requires institutional legal counsel review, formal Data Protection Officer (DPO) appointments, statutory consent registries, Business Associate Agreements (BAA), and physical/operational controls outside the scope of software alone.
 
 1. **Data Fiduciary vs. Data Processor (Sections 2(i) & 2(k))**: Participating hospitals act as Data Fiduciaries; regional hubs and global coordinators act strictly as Data Processors receiving only non-identifiable mathematical weights.
 2. **Consent Lifecycle (Section 6)**: Itemized, revocable institutional and patient consent records managed via `POST /api/v1/consent/manage`.

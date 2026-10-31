@@ -83,7 +83,7 @@ export default function AuditPage() {
               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Hash Chain Valid
             </span>
           </div>
-          <p className="text-slate-500 text-[13px]">Append-only SHA-256 verifiable ledger · HIPAA & GDPR Clinical Compliance</p>
+          <p className="text-slate-500 text-[13px]">Append-only SHA-256 verifiable ledger · Technical Privacy Design Controls (Not a Compliance Claim)</p>
         </div>
         <Button
           onClick={handleExportLogs}

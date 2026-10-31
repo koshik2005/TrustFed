@@ -245,7 +245,7 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
         httponly=True,
         secure=True,
         samesite=_cookie_samesite(request),
-        path="/api/auth",
+        path="/api",
         max_age=7 * 86400,
     )
 
@@ -377,7 +377,7 @@ def logout(
         except Exception:
             pass
 
-    response.delete_cookie(key="tf_refresh_token", path="/api/auth", samesite="none", secure=True)
+    response.delete_cookie(key="tf_refresh_token", path="/api", samesite="none", secure=True)
     if u:
         store.add_audit(db, None, u.email, "auth", f"Logout ({u.role})")
     return {"message": "Logged out successfully"}
@@ -1885,7 +1885,7 @@ def list_model_versions(
             "diseaseCategory": "General Multi-Condition",
             "status": "active",
             "isActive": True,
-            "metrics": {"macroF1": 0.88, "accuracy": 0.89},
+            "metrics": {"macroF1": 0.572, "accuracy": 0.611, "top3Accuracy": 0.861},
             "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
 

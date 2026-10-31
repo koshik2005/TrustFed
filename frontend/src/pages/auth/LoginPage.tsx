@@ -231,7 +231,7 @@ export default function LoginPage() {
           <div className="border-t border-slate-100 pt-3 flex items-center justify-center gap-4 text-[11px] text-slate-500">
             <span className="flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              HIPAA Compliant
+              Zero PHI Egress Design
             </span>
             <span>•</span>
             <span>Local DP (ε = 1.84)</span>

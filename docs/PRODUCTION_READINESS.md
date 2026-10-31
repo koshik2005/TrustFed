@@ -13,11 +13,11 @@
 | **1. Authentication** | JWT + Cookie Rotation + CSRF + Password Policy | **PASS** | Access tokens are 15-minute lifespan and stored **only in memory** via Zustand. Refresh tokens are stored in `httpOnly`, `SameSite=Lax`, `Secure` cookies with double-submit `X-CSRF-Token` validation. Forced password rotation enforced on first login (`must_reset_password`). Password policy requires $\ge 8$ chars, mixed case, numbers, and symbols. |
 | **2. Authorization & Tenancy** | Object-Level Scoping & Tier Isolation | **PASS** | Strict four-tier RBAC (`hospital_staff`, `doctor`, `regional_admin`, `global_admin`). Staff and doctors are hard-locked to their originating `hospital_id`. Regional admins are hard-locked to their assigned `hub_id`. Direct cross-tenant queries return `HTTP 403 Forbidden`. Attempting unauthenticated access returns `HTTP 401 Unauthorized`. |
 | **3. Patient-Data Protection** | AES-128 Encryption & Zero-Egress PHI | **PASS** | Patient Names and Contacts are encrypted at rest using Fernet (AES-128-CBC + HMAC-SHA256). Direct PHI **never leaves the hospital database boundary**. Logs apply `PHIRedactionFilter` masking patient IDs (`PT-XXXX`), phone numbers, emails, and bearer tokens. |
-| **4. Privacy Accounting Honesty** | Rényi DP Moments Accountant & Zero Spoofing | **PASS** | Differential privacy uses Rényi Differential Privacy (RDP) via local DP-SGD. Privacy parameters are calculated strictly from mathematical noise multipliers ($\sigma$) and sampling ratios ($q$). If user targets an unreachable $\varepsilon$, the engine reports the true mathematical cost honestly without spoofing. |
-| **5. Model Promotion Gate** | Automated Multi-Metric Candidate Validation | **PASS** | Candidate federated models are evaluated on a held-out clinical validation set. Promotion occurs **only** if overall Macro-F1 improves, no individual disease regresses beyond a tolerance threshold ($\Delta \text{F1} \le 0.05$), and subgroup fairness divergence does not exceed 0.08. One-click instant rollback is operational. |
+| **4. Privacy Accounting Honesty** | Rényi DP Moments Accountant (No Caps) | **PASS** | Differential privacy uses Rényi Differential Privacy (RDP) via local DP-SGD. Privacy parameters are calculated strictly from mathematical noise multipliers ($\sigma = 1.2$), clipping norm ($C = 1.0$), subsampling ratio ($q = \text{batch}/n$), and composition steps ($T$). If the user specifies an unreachable target $\varepsilon$, the accountant never caps or clamps the value to falsify compliance; it honestly displays the real computed $\varepsilon$ and flags `targetMet: false`. *(Design consideration, not a statutory compliance claim).* |
+| **5. Model Promotion Gate** | Automated Multi-Metric Candidate Validation | **PASS** | Candidate federated models are evaluated on a held-out clinical validation set ($N=216$). Promotion occurs **only** if overall Macro-F1 improves, no individual disease regresses beyond a tolerance threshold ($\Delta \text{F1} \le 0.05$), and subgroup fairness divergence does not exceed 0.08. One-click instant rollback is operational. |
 | **6. Red-Flag Safety Rules** | Deterministic Emergency Triage Guardrails | **PASS** | Hardcoded deterministic rules ([red_flags.py](file:///d:/projects/TrustFed/backend/services/red_flags.py)) run synchronously prior to returning predictions. Immediate emergency warnings trigger for ACS, stroke (FAST), hypoxemia ($\text{SpO}_2 < 92\%$), meningitis, infant high fever ($< 1\text{ yr}, \ge 38.5^\circ\text{C}$), and hypovolemic shock. |
 | **7. Test Suite Coverage** | Unit, Tenancy, Integration & E2E Suites | **PASS** | **121 automated tests passing across entire platform**: 84 backend Pytest tests, 22 frontend Vitest tests, 10 Playwright security/RBAC E2E tests, and 5 Playwright clinical/federated E2E tests. |
-| **8. Continuous Integration (CI)** | Automated Pipeline Specification | **PASS** | Complete workflow template authored in [ci-workflow.yml](file:///d:/projects/TrustFed/docs/ci-workflow.yml) covering backend linting, `pip-audit`, pytest, frontend linting, `npm audit`, vitest, production build, and headless Playwright E2E tests. |
+| **8. Continuous Integration (CI)** | Automated Pipeline Specification | **FAIL** | **Marked FAIL pending workflow file upload via GitHub UI.** The full workflow definition is authored in [docs/ci-workflow.yml](file:///d:/projects/TrustFed/docs/ci-workflow.yml). Pushing `.github/workflows/ci.yml` via local Git CLI was rejected because the local OAuth token lacks the `workflow` scope. It must be added via the GitHub Web UI or PAT with `workflow` scope. |
 | **9. Monitoring & Error Telemetry** | Structured JSON Logging & Sentry Scrubber | **PASS** | [logging_config.py](file:///d:/projects/TrustFed/backend/core/logging_config.py) formats structured JSON logs with zero PHI leakage. Sentry error reporting configured with `send_default_pii=False` and regex scrubbers for clinical fields before network transmission. |
 | **10. Security Headers** | CSP, HSTS, Framing & Sniffing Mitigation | **PASS** | Injected via FastAPI middleware and Vercel CDN: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`. Verified live with `curl -I`. |
 
@@ -48,3 +48,71 @@
 1. **Symptom Subjectivity**: Self-reported pain, fatigue, and malaise exhibit high inter-patient variability that cannot be fully standardized by categorical binary inputs.
 2. **Missing Laboratory Data**: While native missingness indicators prevent arbitrary imputation bias, unmeasured lab parameters (e.g. missing platelet count in suspected Dengue) naturally widen the diagnostic uncertainty bounds.
 3. **Synthetic Baseline Cohort**: Baseline pre-training was derived from validated medical distributions rather than uncurated raw hospital EHR feeds. Real-world emergency triage accuracy will be lower than idealized benchmarks.
+
+---
+
+## 4. Production Security Headers Verification (`curl -I`)
+
+### 4.1. Vercel Production Frontend (`https://frontend-3qgo.vercel.app`)
+```http
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Access-Control-Allow-Origin: *
+Age: 0
+Cache-Control: public, max-age=0, must-revalidate
+Content-Disposition: inline
+Content-Length: 2515
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://trustfed-backend.onrender.com; frame-ancestors 'none';
+Content-Type: text/html; charset=utf-8
+Date: Sat, 31 Oct 2026 03:04:12 GMT
+Etag: "71316a615d6b30bd1d30bc67c4568a33"
+Last-Modified: Sat, 31 Oct 2026 03:04:12 GMT
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Referrer-Policy: strict-origin-when-cross-origin
+Server: Vercel
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Vercel-Cache: MISS
+X-Vercel-Id: bom1::4bqdp-1793415852169-062ca9fc3280
+X-Xss-Protection: 1; mode=block
+```
+
+### 4.2. Render Production Backend (`https://trustfed-backend.onrender.com/health`)
+```http
+HTTP/1.1 200 OK
+Date: Sat, 31 Oct 2026 03:04:19 GMT
+Content-Type: application/json
+Connection: keep-alive
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://trustfed-backend.onrender.com https://frontend-3qgo.vercel.app; frame-ancestors 'none';
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: strict-origin-when-cross-origin
+rndr-id: c173eb59-18c3-4cbb
+Server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Origin
+vary: Accept-Encoding
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-render-origin-server: uvicorn
+cf-cache-status: DYNAMIC
+CF-RAY: a52f6e7f9969ca8c-MAA
+alt-svc: h3=":443"; ma=86400
+```
+
+---
+
+## 5. Cryptographic Keys, Tenancy Governance & Limitations
+
+### 5.1. Fernet Key Lifecycle & Recovery
+- **Storage**: Injected as `PATIENT_ENCRYPTION_KEY` environment secret on Render. Derived with `PBKDF2HMAC-SHA256` (100,000 iterations, static salt) if derived from master secret.
+- **Rotation**: Supported via Python `cryptography.fernet.MultiFernet([new_key, old_key])` with database re-encryption (`rotate(token)`).
+- **Disaster Recovery**: Cryptographic erasure occurs if the secret is unbacked. Recovery plan requires secure storage in an air-gapped institutional vault with RTO $< 5$ minutes via environment variable re-injection.
+
+### 5.2. Paillier Key Authority vs Regional Hub Visibility
+- **Key Authority**: In the theoretical/research cryptosystem (`backend/tefl/secagg.py`), the Paillier private key $(\lambda, \mu)$ is held by an independent Key Authority; hubs only see additive shares, and the global aggregator only sums ciphertexts ($g=n+1$).
+- **Live Web Tier Limitation (Honest Disclosure)**: In the live production web service (`backend/services/federated_learning.py`), regional hubs receive DP-SGD-noised parameter weights $(W, b)$ from hospitals and compute weighted FedAvg. The regional hub can observe individual hospital weight updates (protected by DP-SGD noise, without SMPC / Paillier ciphertext masking in the live REST tier).
+
+### 5.3. Optional De-Identified Record Sharing
+- **Status**: Implemented for jurisdictional regional hub nodes (`GET /api/v1/regional/hubs/{id}/deidentified-records`) and tested with strict allow-list serializer `ALLOWED_DEIDENTIFIED_KEYS = {"age_band", "sex", "symptoms", "vitals", "confirmed_diagnosis", "cause", "treatment"}`.
+- **Limitation**: Cross-consortium raw record pooling or third-party allow-lists are **NOT DONE** (deliberately omitted to prevent multi-center data concentration).

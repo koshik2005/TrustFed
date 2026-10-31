@@ -317,9 +317,18 @@ def seed_synthetic_data(db: Session, force: bool = False):
             ))
     db.commit()
 
-    # 6. Global & Regional Model Versions
+    # 6. Global & Regional Model Versions (Evaluated on Held-Out Test Cohort N=216)
     models_to_seed = [
-        ("TF-GenDisease-v1.0", "global", None, "General Multi-Condition", {"top3_accuracy": 0.912, "accuracy": 0.864, "macro_f1": 0.851}),
+        ("TF-GenDisease-v1.0", "global", None, "General Multi-Condition", {
+            "top3Accuracy": 0.861,
+            "top3_accuracy": 0.861,
+            "top1Accuracy": 0.611,
+            "accuracy": 0.611,
+            "macroF1": 0.572,
+            "macro_f1": 0.572,
+            "ece": 0.0919,
+            "split": "Held-out test cohort (N=216, 20% stratified split)"
+        }),
         ("TF-HeartNet-v2", "global", None, "Cardiovascular Risk", {"accuracy": 0.883, "epsilon": 1.84, "auc": 0.915})
     ]
     for ver, scope, sid, cat, metrics in models_to_seed:

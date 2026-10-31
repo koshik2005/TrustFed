@@ -88,8 +88,8 @@ export default function HospitalDashboard() {
     diseaseDistribution
   } = data;
 
-  const top1AccPct = Math.round((localAccuracy?.top1Accuracy ?? 0.88) * 100);
-  const top3AccPct = Math.round((localAccuracy?.top3Accuracy ?? 0.96) * 100);
+  const top1AccPct = Math.round((localAccuracy?.top1Accuracy ?? 0.611) * 100);
+  const top3AccPct = Math.round((localAccuracy?.top3Accuracy ?? 0.861) * 100);
 
   return (
     <motion.div
@@ -356,7 +356,7 @@ export default function HospitalDashboard() {
             </p>
             <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-700 pt-3">
               <span>Accountant Status</span>
-              <span className="text-emerald-400 font-semibold font-mono">δ = 1e-5 certified</span>
+              <span className="text-emerald-400 font-semibold font-mono">δ = 1e-5 (RDP bound, C=1.0, σ=1.2)</span>
             </div>
           </Card>
         </div>
