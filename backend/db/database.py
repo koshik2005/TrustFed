@@ -9,10 +9,21 @@ SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
 
 def _make_engine():
     """Try Supabase first, fall back to local SQLite."""
-    if SUPABASE_DB_URL and SUPABASE_DB_URL.startswith("postgresql"):
+    if SUPABASE_DB_URL and (SUPABASE_DB_URL.startswith("postgresql") or SUPABASE_DB_URL.startswith("postgres")):
+        db_url = SUPABASE_DB_URL.strip()
+        # In SQLAlchemy 2.0+, 'postgresql://' defaults to psycopg v3 ('psycopg').
+        # If psycopg v3 is not installed, rewrite prefix to psycopg2 so psycopg2-binary works seamlessly.
+        try:
+            import psycopg  # noqa: F401
+        except ImportError:
+            if db_url.startswith("postgresql://"):
+                db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            elif db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
         try:
             eng = create_engine(
-                SUPABASE_DB_URL,
+                db_url,
                 pool_pre_ping=True,
                 pool_size=5,
                 max_overflow=10,
