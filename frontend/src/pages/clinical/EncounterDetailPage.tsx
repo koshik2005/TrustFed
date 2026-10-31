@@ -200,12 +200,18 @@ export default function EncounterDetailPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-rose-900 font-extrabold text-sm tracking-wide">
               <AlertTriangle className="w-5 h-5 text-rose-600 animate-pulse" />
-              CRITICAL CLINICAL RED-FLAG SAFETY OVERRIDE
+              <span>CRITICAL CLINICAL RED-FLAG SAFETY OVERRIDE</span>
+              <span className="text-[10px] font-semibold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                Pending Physician Review
+              </span>
             </div>
             <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-rose-600 text-white tracking-wider">
               Immediate Escalation Stat
             </span>
           </div>
+          <p className="text-[11px] text-rose-700 italic">
+            Deterministic safety heuristics; all physiological cutoffs are pending formal hospital physician review and clinical trial validation.
+          </p>
           <div className="space-y-2">
             {encounter.redFlags?.map((rf) => (
               <div key={rf.ruleId} className="bg-white/95 border border-rose-200 rounded-xl p-3.5 space-y-1.5 shadow-2xs">

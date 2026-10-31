@@ -100,10 +100,11 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'tf-auth',
-      // Only persist safe metadata, NEVER in-memory access token or CSRF token
+      // Persist user, isAuthenticated, and CSRF token for refresh rotation; NEVER persist raw access token
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        csrfToken: state.csrfToken,
       }),
     }
   )

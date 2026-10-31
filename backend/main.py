@@ -28,6 +28,8 @@ limiter = Limiter(key_func=get_client_ip, default_limits=["120/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     auth.validate_secret_key_on_startup()
+    from services import crypto
+    crypto.validate_encryption_key_on_startup()
     from db.migrations.v2_general_disease_migration import migrate_up
     migrate_up(engine)
     db = SessionLocal()

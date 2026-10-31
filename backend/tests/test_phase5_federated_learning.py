@@ -399,7 +399,7 @@ def test_promotion_gate_promotes_improving_model():
             candidate_W=cand_W,
             candidate_b=cand_b,
             current_model=base,
-            config={"sessionId": "test-promote-session", "regression_tolerance": 0.10, "fairness_tolerance": 0.10},
+            config={"sessionId": "test-promote-session", "regression_tolerance": 0.10, "fairness_tolerance": 0.10, "min_f1_gain": 0.0},
             db=db,
             validation_cohort=val_cohort
         )
@@ -680,3 +680,37 @@ def test_list_models_lineage_endpoint():
     active_models = [m for m in data["models"] if m["isActive"]]
     assert len(active_models) == 1
     assert active_models[0]["version"] == data["activeVersion"]
+
+
+
+# ── Test 10: Promotion Gate Rejects Insufficient Macro-F1 Gain ──────────────────
+
+def test_promotion_gate_rejects_insufficient_f1_gain():
+    """A candidate model whose macro-F1 gain is below the 0.01 minimum (+0.0007)
+    must be REJECTED — not promoted. This ensures the promotion gate cannot be
+    bypassed by noise or negligible improvements."""
+    base_model = general_disease_model.GeneralDiseaseModel()
+    W_candidate = base_model.W.copy() + np.random.normal(0, 1e-5, base_model.W.shape)
+    b_candidate = base_model.b.copy() + np.random.normal(0, 1e-5, base_model.b.shape)
+
+    config = {
+        "sessionId": "test-insufficient-f1-gain",
+        "regression_tolerance": 0.0,
+        "fairness_tolerance": 0.05,
+        "min_f1_gain": 0.01,
+    }
+
+    db = SessionLocal()
+    try:
+        result = federated_learning.evaluate_and_promote_gate(
+            W_candidate, b_candidate, base_model, config, db
+        )
+        assert result["promoted"] is False, (
+            f"Expected candidate to be rejected due to gain < 0.01, but got promoted=True: {result}"
+        )
+        reason = result.get("reason", "").lower()
+        assert any(kw in reason for kw in ("gain", "minimum", "below", "regressed")), f"Unexpected reason: {reason}"
+        assert "macroF1Delta" in result
+        assert result["macroF1Delta"] < 0.01, f"Expected delta < 0.01, got {result['macroF1Delta']}"
+    finally:
+        db.close()

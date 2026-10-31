@@ -234,6 +234,46 @@ def test_per_account_failed_login_throttling():
     assert "Too many failed login attempts for account" in lockout_resp.json()["detail"]
 
 
+def test_validate_encryption_key_startup_check():
+    """Verify that in production environments, missing or invalid PATIENT_ENCRYPTION_KEY fails hard."""
+    from services.crypto import validate_encryption_key_on_startup
+    from cryptography.fernet import Fernet
+    import pytest
+
+    old_env = os.environ.get("ENVIRONMENT")
+    old_key = os.environ.get("PATIENT_ENCRYPTION_KEY")
+    try:
+        os.environ["ENVIRONMENT"] = "production"
+        
+        # 1. Missing key in production must raise RuntimeError
+        os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
+        with pytest.raises(RuntimeError) as exc_missing:
+            validate_encryption_key_on_startup()
+        assert "PATIENT_ENCRYPTION_KEY environment variable is required in production" in str(exc_missing.value)
+
+        # 2. Invalid Fernet key in production must raise RuntimeError
+        os.environ["PATIENT_ENCRYPTION_KEY"] = "not-a-valid-fernet-key"
+        with pytest.raises(RuntimeError) as exc_invalid:
+            validate_encryption_key_on_startup()
+        assert "not a valid Fernet key" in str(exc_invalid.value)
+
+        # 3. Valid Fernet key in production succeeds
+        valid_key = Fernet.generate_key().decode()
+        os.environ["PATIENT_ENCRYPTION_KEY"] = valid_key
+        validate_encryption_key_on_startup()  # Should not raise
+
+        # 4. In development, missing key is allowed
+        os.environ["ENVIRONMENT"] = "development"
+        os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
+        validate_encryption_key_on_startup()  # Should not raise
+    finally:
+        if old_env: os.environ["ENVIRONMENT"] = old_env
+        else: os.environ.pop("ENVIRONMENT", None)
+        if old_key: os.environ["PATIENT_ENCRYPTION_KEY"] = old_key
+        else: os.environ.pop("PATIENT_ENCRYPTION_KEY", None)
+
+
+
 if __name__ == "__main__":
     import time
     setup_module(sys.modules[__name__])

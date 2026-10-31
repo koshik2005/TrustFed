@@ -3,6 +3,14 @@
 Deterministic safety guardrails that evaluate high-acuity presenting signs and symptoms.
 When triggered, red-flag alerts override routine ambulatory models and provide immediate
 urgent clinical escalation guidance.
+
+CLINICAL DISCLAIMER & THRESHOLD AUDIT:
+--------------------------------------
+All numerical thresholds (SpO2 < 92%, HR >= 120 bpm, Systolic BP < 90 mmHg, Temp >= 38.0/38.5 C)
+are conservative prototype heuristics labeled "PENDING PHYSICIAN REVIEW".
+They have NOT been validated by clinical trials and do NOT substitute for formal triage by
+a licensed medical professional. Tachycardia (HR >= 120) is considered in conjunction with
+concurrent physiological indicators (e.g. acute fluid loss, diaphoresis, hypotension, or dyspnea).
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
@@ -12,7 +20,7 @@ class RedFlagAlert:
     def __init__(self, rule_id: str, severity: str, title: str, description: str, escalation_action: str):
         self.rule_id = rule_id
         self.severity = severity  # "CRITICAL" | "HIGH"
-        self.title = title
+        self.title = title if "[Pending Physician Review]" in title else f"{title} [Pending Physician Review]"
         self.description = description
         self.escalation_action = escalation_action
 
@@ -96,12 +104,13 @@ def evaluate_red_flags(
     clean_ecg = str(structured_ecg).lower().strip() if structured_ecg else ""
 
     # Rule 1: Chest pain with diaphoresis (sweating) or breathlessness or ST change
+    # Note: Tachycardia (HR >= 120) requires concurrent chest pain (dual sign requirement)
     has_chest_pain = "chest_pain" in clean_symptoms
     has_cardiac_assoc = (
         "sweating" in clean_symptoms
         or "breathlessness" in clean_symptoms
         or "dyspnea" in clean_symptoms
-        or (hr is not None and hr >= 120)
+        or (hr is not None and hr >= 120)  # Tachycardia coupled with presenting chest pain
         or ("st_change" in clean_ecg or "st_depression" in clean_ecg)
     )
     if has_chest_pain and has_cardiac_assoc:

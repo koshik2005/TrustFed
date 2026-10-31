@@ -83,7 +83,11 @@ The model is bound by deterministic clinical safety guardrails ([red_flags.py](f
 - **Acute Stroke**: Positive FAST neurological indicators (facial droop, arm weakness, speech difficulty).
 - **Suspected Meningitis**: Pyrexia combined with nuchal rigidity / neck stiffness.
 - **High Fever in Infant**: Age $< 1$ year with core temperature $\ge 38.5^\circ\text{C}$.
-- **Hypovolemic Shock**: Severe dehydration from vomiting/diarrhea with systolic $\text{BP} < 90\text{ mmHg}$.
+- **Hypovolemic Shock**: Severe dehydration from vomiting/diarrhea with systolic $\text{BP} < 90\text{ mmHg}$ or tachycardia with shock indicators.
+
+> [!CAUTION]
+> **Threshold Status — Pending Physician Review**:
+> All numerical thresholds ($\text{SpO}_2 < 92\%$, $\text{HR} \ge 120\text{ bpm}$, systolic $\text{BP} < 90\text{ mmHg}$, temperature $\ge 38.0^\circ\text{C} / 38.5^\circ\text{C}$) are conservative heuristic starting points labeled **"Pending Physician Review"**. They have not been independently validated in clinical trials and require formal review, calibration, and sign-off by a licensed clinician before any live healthcare deployment. Tachycardia ($\text{HR} \ge 120\text{ bpm}$) is evaluated in conjunction with concurrent physiological signs (presenting chest pain, acute fluid loss, diaphoresis, or hypotension).
 
 ---
 

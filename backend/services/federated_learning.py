@@ -514,8 +514,12 @@ def evaluate_and_promote_gate(
     curr_eval = evaluate_model_on_cohort(current_model.W, current_model.b, cohort)
     cand_eval = evaluate_model_on_cohort(candidate_W, candidate_b, cohort)
 
-    reg_tol = float(config.get("regression_tolerance", 0.05))
+    reg_tol = float(config.get("regression_tolerance", 0.0))
     fair_tol = float(config.get("fairness_tolerance", 0.05))
+    # Minimum macro-F1 *gain* required for promotion (configurable, default +0.01).
+    # A candidate that merely avoids regression is not sufficient; it must demonstrate
+    # measurable improvement. Set min_f1_gain=0.0 in config to allow no-regression-only.
+    min_f1_gain = float(config.get("min_f1_gain", 0.01))
 
     rejections: List[str] = []
 
@@ -527,10 +531,11 @@ def evaluate_and_promote_gate(
 
     macro_f1_delta = round(float(cand_eval["macroF1"] - curr_eval["macroF1"]), 4)
 
-    # Criterion A: Overall Macro-F1
-    if cand_eval["macroF1"] < curr_eval["macroF1"] - 0.001:
+    # Criterion A: Overall Macro-F1 must improve by at least min_f1_gain
+    if macro_f1_delta < min_f1_gain:
         rejections.append(
-            f"Overall Macro-F1 dropped from {curr_eval['macroF1']:.3f} to {cand_eval['macroF1']:.3f} (delta {macro_f1_delta:+.4f})."
+            f"Macro-F1 gain {macro_f1_delta:+.4f} is below the required minimum gain of +{min_f1_gain:.4f} "
+            f"(current {curr_eval['macroF1']:.4f} → candidate {cand_eval['macroF1']:.4f})."
         )
 
     # Criterion B: Per-disease regression check

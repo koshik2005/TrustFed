@@ -16,6 +16,33 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 _KEY_CACHE: Optional[bytes] = None
 
 
+def validate_encryption_key_on_startup() -> None:
+    """Called at startup. In production, raises RuntimeError if PATIENT_ENCRYPTION_KEY
+    env var is absent or invalid — prevents silent use of a random ephemeral key that
+    loses all encrypted data on every restart.
+    """
+    env = os.getenv("ENVIRONMENT", "development").strip().lower()
+    is_production = env in ("production", "prod") or bool(os.getenv("RENDER"))
+    if not is_production:
+        return  # dev/test: random ephemeral key is acceptable
+
+    env_key = os.getenv("PATIENT_ENCRYPTION_KEY")
+    if not env_key or not env_key.strip():
+        raise RuntimeError(
+            "PATIENT_ENCRYPTION_KEY environment variable is required in production "
+            "but is missing or empty. Set it as a persistent Render environment variable "
+            "to a valid Fernet key (generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"). "
+            "Without it, encrypted patient data cannot be decrypted after a server restart."
+        )
+    try:
+        Fernet(env_key.strip().encode("utf-8"))
+    except Exception as e:
+        raise RuntimeError(
+            f"PATIENT_ENCRYPTION_KEY is set but is not a valid Fernet key: {e}. "
+            "Regenerate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        ) from e
+
+
 def get_phi_encryption_key() -> bytes:
     """Return a 32-byte URL-safe base64-encoded key for Fernet symmetric encryption.
     
