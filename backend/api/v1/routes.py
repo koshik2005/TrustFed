@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 import numpy as np
 from db.database import get_db
 from db import models
-from services import auth, crypto, inference, store, disease_inference, clinical_validation, general_disease_model, federated_learning
+from services import auth, crypto, inference, store, disease_inference, clinical_validation, general_disease_model, federated_learning, dashboard_service
 from services.explanation import generate_clinical_explanation
 from tefl import nn
 
@@ -1968,4 +1968,79 @@ def privacy_accounting(
         target_epsilon=target_epsilon
     )
     return res
+
+
+# ── Phase 6: Role Dashboards (Hospital, Regional Hub, Global Admin) ────────────
+
+@router.get("/dashboard/hospital")
+def get_hospital_dashboard(
+    hospital_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    u: models.User = Depends(require("hospital_staff", "doctor", "global_admin"))
+):
+    """Hospital Tier Dashboard:
+    - Scoped strictly to the user's hospital (hospital_staff / doctor).
+    - Global admin can optionally inspect any hospital node.
+    - Cross-hospital access by clinical staff is forbidden (403).
+    """
+    if u.role in ("hospital_staff", "doctor"):
+        if not u.hospital_id:
+            raise HTTPException(400, "User account is not bound to a hospital node")
+        if hospital_id and hospital_id != u.hospital_id:
+            raise HTTPException(403, "Access forbidden: cannot view another hospital's dashboard")
+        target_hosp_id = u.hospital_id
+    else:
+        # global_admin
+        if hospital_id:
+            target_hosp_id = hospital_id
+        else:
+            first_h = db.query(models.Hospital).first()
+            if not first_h:
+                raise HTTPException(404, "No hospitals exist in system")
+            target_hosp_id = first_h.id
+
+    return dashboard_service.get_hospital_dashboard_data(db, target_hosp_id)
+
+
+@router.get("/dashboard/regional")
+def get_regional_dashboard(
+    hub_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    u: models.User = Depends(require("regional_admin", "global_admin"))
+):
+    """Regional Tier Dashboard:
+    - Scoped strictly to the regional coordinator's hub (regional_admin).
+    - Global admin can inspect any regional hub.
+    - Cross-hub access by regional admin is forbidden (403).
+    """
+    if u.role == "regional_admin":
+        if not u.hub_id:
+            raise HTTPException(400, "Regional admin account is not bound to a regional hub")
+        if hub_id and hub_id != u.hub_id:
+            raise HTTPException(403, "Access forbidden: cannot view another regional hub's dashboard")
+        target_hub_id = u.hub_id
+    else:
+        # global_admin
+        if hub_id:
+            target_hub_id = hub_id
+        else:
+            first_hub = db.query(models.RegionalHub).first()
+            if not first_hub:
+                raise HTTPException(404, "No regional hubs exist in system")
+            target_hub_id = first_hub.id
+
+    return dashboard_service.get_regional_dashboard_data(db, target_hub_id)
+
+
+@router.get("/dashboard/global")
+def get_global_dashboard(
+    db: Session = Depends(get_db),
+    u: models.User = Depends(require("global_admin"))
+):
+    """Global Tier Dashboard:
+    - Strictly restricted to global_admin (403 for all other roles).
+    - Aggregates consortium hubs, global model versions, federated rounds, audit ledger, and privacy.
+    """
+    return dashboard_service.get_global_dashboard_data(db)
+
 

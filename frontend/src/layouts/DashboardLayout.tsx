@@ -12,21 +12,20 @@ import { cn } from '@/utils';
 import type { NavItem } from '@/types';
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',             label: 'Hospital Dashboard',    path: '/dashboard',     icon: 'LayoutDashboard', roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'dashboard',             label: 'Role Dashboard',        path: '/dashboard',     icon: 'LayoutDashboard', roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
   { id: 'patients',              label: 'Patient Directory',     path: '/patients',      icon: 'Users',           roles: ['hospital_staff', 'doctor', 'global_admin'] },
   { id: 'new-patient',           label: 'New Patient Intake',    path: '/patients/new',  icon: 'UserPlus',        roles: ['hospital_staff', 'doctor', 'global_admin'] },
   { id: 'pending-confirmations', label: 'Doctor Confirmations', path: '/doctor/pending', icon: 'Stethoscope',    roles: ['doctor', 'global_admin'] },
-  { id: 'prediction',            label: 'Cardiac Prediction',    path: '/prediction',    icon: 'BrainCircuit',    roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
-  { id: 'explain',               label: 'Explainability',        path: '/explain',       icon: 'FlaskConical',    roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
+  { id: 'prediction',            label: 'Clinical Prediction',   path: '/prediction',    icon: 'BrainCircuit',    roles: ['hospital_staff', 'doctor', 'global_admin'] },
   { id: 'hubs',                  label: 'Regional Hubs',         path: '/hubs',          icon: 'Network',         roles: ['global_admin'] },
   { id: 'regional',              label: 'Regional Hospitals',    path: '/regional',      icon: 'Hospital',        roles: ['regional_admin', 'global_admin'] },
-  { id: 'training',              label: 'Global Training',       path: '/training',      icon: 'Activity',        roles: ['regional_admin', 'global_admin'] },
-  { id: 'comparison',            label: 'Model Comparison',      path: '/comparison',    icon: 'BarChart3',       roles: ['regional_admin', 'global_admin'] },
+  { id: 'training',              label: 'Global Training',       path: '/training',      icon: 'Activity',        roles: ['global_admin'] },
   { id: 'fairness',              label: 'Fairness Audit',        path: '/fairness',      icon: 'ShieldAlert',     roles: ['global_admin'] },
   { id: 'privacy',               label: 'Privacy Report',        path: '/privacy',       icon: 'Shield',          roles: ['global_admin'] },
   { id: 'audit',                 label: 'Audit Log',             path: '/audit',         icon: 'ScrollText',      roles: ['global_admin'] },
   { id: 'settings',              label: 'Settings',              path: '/settings',      icon: 'Settings',        roles: ['hospital_staff', 'doctor', 'regional_admin', 'global_admin'] },
 ];
+
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   LayoutDashboard, Activity, BrainCircuit, FlaskConical,
@@ -165,6 +164,14 @@ export default function DashboardLayout() {
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-slate-50">
+        {/* Visible Demo Environment Banner */}
+        <div className="bg-amber-400 text-amber-950 px-4 py-1.5 text-xs font-semibold flex items-center justify-between border-b border-amber-500/30 flex-shrink-0">
+          <div className="flex items-center gap-2 mx-auto">
+            <span className="text-sm">⚠️</span>
+            <span>DEMO ENVIRONMENT — Synthetic clinical and federated data only. Real PHI is prohibited.</span>
+          </div>
+        </div>
+
         {/* Top Header */}
         <header className="h-14 flex items-center justify-between px-4 sm:px-6 border-b border-slate-200 bg-white flex-shrink-0 shadow-xs">
           <div className="flex items-center gap-3">

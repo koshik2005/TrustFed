@@ -481,6 +481,23 @@ export const federatedApi = {
   },
 };
 
+export const dashboardApi = {
+  getHospitalDashboard: async (hospitalId?: string): Promise<any> => {
+    const res = await apiClient.get('/dashboard/hospital', { params: hospitalId ? { hospital_id: hospitalId } : {} });
+    return res.data;
+  },
+
+  getRegionalDashboard: async (hubId?: string): Promise<any> => {
+    const res = await apiClient.get('/dashboard/regional', { params: hubId ? { hub_id: hubId } : {} });
+    return res.data;
+  },
+
+  getGlobalDashboard: async (): Promise<any> => {
+    const res = await apiClient.get('/dashboard/global');
+    return res.data;
+  },
+};
+
 export const api = {
   authApi,
   trainingApi,
@@ -491,5 +508,7 @@ export const api = {
   regionalHospitalsApi,
   clinicalApi,
   federatedApi,
+  dashboardApi,
 };
+
 
