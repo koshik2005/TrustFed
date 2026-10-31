@@ -65,6 +65,14 @@ const COMMON_SYMPTOMS = [
   'burning urination', 'loss of taste/smell', 'nausea', 'wheezing'
 ];
 
+const formatDiseaseName = (name?: string) => {
+  if (!name) return '';
+  return name
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 export default function PredictionPage() {
   const navigate = useNavigate();
   const [age, setAge] = useState<number>(28);
@@ -312,7 +320,7 @@ export default function PredictionPage() {
                     <div key={pred.disease} className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-slate-800">
-                          {i + 1}. {pred.displayName || pred.disease.replace('_', ' ').title()}
+                          {i + 1}. {pred.displayName || formatDiseaseName(pred.disease)}
                         </span>
                         <span className="font-mono font-bold text-blue-700">{probPct}% probability</span>
                       </div>
