@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["SECRET_KEY"] = "phase3-super-secure-production-ready-key-2026-test"
 os.environ["ENVIRONMENT"] = "development"
+os.environ["APP_MODE"] = "clinical"
 
 from main import app
 from db.database import Base, engine, SessionLocal
@@ -73,6 +74,10 @@ def setup_module(module):
         db.commit()
     finally:
         db.close()
+
+
+def teardown_module(module):
+    os.environ["APP_MODE"] = "informational"
 
 
 def _login(email: str, password: str = "Pass123!SecureClinical") -> str:

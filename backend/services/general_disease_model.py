@@ -17,9 +17,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from .red_flags import evaluate_red_flags
+from core.deployment_mode import PERSISTENT_DISCLAIMER
 
 MODEL_VERSION = "TF-GenDisease-v1.0"
-CLINICAL_DISCLAIMER = "Clinical decision support only, not a diagnosis."
+CLINICAL_DISCLAIMER = PERSISTENT_DISCLAIMER
 
 DISEASE_KEYS = [
     "common_cold", "influenza", "viral_fever", "dengue", "typhoid", "malaria",

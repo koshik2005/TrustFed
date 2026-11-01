@@ -91,6 +91,7 @@ describe('Phase 3: Clinical Patient & Doctor Confirmation UI', () => {
   });
 
   it('EncounterDetailPage renders differential top-3 and allows doctor confirmation', async () => {
+    useAuthStore.getState().setAppMode('clinical');
     useAuthStore.getState().login({
       id: '2',
       name: 'Dr. Ross',
@@ -148,6 +149,7 @@ describe('Phase 3: Clinical Patient & Doctor Confirmation UI', () => {
   });
 
   it('EncounterDetailPage restricts hospital staff from confirming diagnoses', async () => {
+    useAuthStore.getState().setAppMode('clinical');
     useAuthStore.getState().login({
       id: '3',
       name: 'Nurse Chen',
@@ -265,7 +267,7 @@ describe('Phase 3: Clinical Patient & Doctor Confirmation UI', () => {
         suggestedCause: 'Atherosclerotic coronary artery plaque rupture.',
         commonRemedies: ['Aspirin 300mg stat', 'Nitroglycerin sublingual', 'Urgent cardiology consult']
       },
-      disclaimer: 'Clinical decision support only, not a diagnosis.',
+      disclaimer: 'Educational decision support. Not medical advice. Not clinically validated. In an emergency call your local emergency number.',
       doctorConfirmedDiagnosis: null,
       trainable: false,
       status: 'pending',
@@ -305,7 +307,47 @@ describe('Phase 3: Clinical Patient & Doctor Confirmation UI', () => {
       expect(screen.getByText(/Atherosclerotic coronary artery plaque rupture/i)).toBeInTheDocument();
 
       // 5. Mandatory disclaimer
-      expect(screen.getByText(/Clinical decision support only, not a diagnosis/i)).toBeInTheDocument();
+      expect(screen.getByText(/Educational decision support\. Not medical advice/i)).toBeInTheDocument();
+    });
+  });
+
+  it('EncounterDetailPage disables doctor confirmation workflow in informational mode', async () => {
+    useAuthStore.getState().setAppMode('informational');
+    useAuthStore.getState().login({
+      id: '2',
+      name: 'Dr. Ross',
+      email: 'doctor@trustfed.ai',
+      role: 'doctor',
+      hospitalId: '1',
+    }, 'mock-doctor-token');
+
+    vi.mocked(clinicalApi.getEncounterDetail).mockResolvedValue({
+      id: 57,
+      encounterIdentifier: 'ENC-TEST-57',
+      patientId: 103,
+      hospitalId: '1',
+      symptoms: ['fever'],
+      symptomDurationDays: 1,
+      vitals: {},
+      structuredEcgFinding: 'normal',
+      modelVersion: 'TF-GenDisease-v1.0',
+      predictedTop3: [{ disease: 'Dengue Fever', probability: 0.8 }],
+      trainable: false,
+      status: 'pending',
+      disclaimer: 'Educational decision support. Not medical advice. Not clinically validated. In an emergency call your local emergency number.',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/encounters/57']}>
+        <Routes>
+          <Route path="/encounters/:id" element={<EncounterDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Doctor Confirmation Workflow Disabled/i)).toBeInTheDocument();
+      expect(screen.getByText(/Educational decision support\. Not medical advice/i)).toBeInTheDocument();
     });
   });
 });

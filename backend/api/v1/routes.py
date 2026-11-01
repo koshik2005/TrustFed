@@ -15,6 +15,8 @@ from db.database import get_db
 from db import models
 from services import auth, crypto, inference, store, disease_inference, clinical_validation, general_disease_model, federated_learning, dashboard_service
 from services.explanation import generate_clinical_explanation
+from core import deployment_mode
+from core.deployment_mode import PERSISTENT_DISCLAIMER
 from tefl import nn
 
 router = APIRouter()
@@ -949,7 +951,7 @@ def _pred_json(p: models.PatientPrediction):
         "shapValues": json.loads(p.shap_values or "[]"),
         "modelVersion": model_version,
         "isFallback": is_fallback,
-        "disclaimer": "Clinical decision support only, not a diagnosis. For use by qualified healthcare professionals.",
+        "disclaimer": PERSISTENT_DISCLAIMER,
         "predictedAt": str(p.created_at)
     }
 
@@ -1307,6 +1309,14 @@ def register_patient_and_encounter(
     db: Session = Depends(get_db),
     u=Depends(require(*CLINICAL_ROLES))
 ):
+    # 0. Enforce Informational vs Clinical Mode rules
+    if deployment_mode.is_informational_mode():
+        if (body.name and body.name.strip()) or (body.contact and body.contact.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail="Patient names and contacts cannot be collected in Informational Mode. Switch to Clinical Mode or omit identifiable fields."
+            )
+
     hospital_id = _resolve_hospital_scope(u, body.hospital_id)
 
     # 1. Validate demographics server-side
@@ -1325,9 +1335,9 @@ def register_patient_and_encounter(
             detail={"errors": all_errors, "message": "Clinical validation failed. Please check the values entered."}
         )
 
-    # 2. Encrypt PHI at rest
-    name_encrypted = crypto.encrypt_phi(body.name) if body.name else ""
-    contact_encrypted = crypto.encrypt_phi(body.contact) if body.contact else ""
+    # 2. Encrypt PHI at rest (or store blank in informational mode)
+    name_encrypted = crypto.encrypt_phi(body.name) if (body.name and not deployment_mode.is_informational_mode()) else ""
+    contact_encrypted = crypto.encrypt_phi(body.contact) if (body.contact and not deployment_mode.is_informational_mode()) else ""
 
     # Parse biological sex
     sex_int = 0
@@ -1338,7 +1348,11 @@ def register_patient_and_encounter(
     elif str(body.sex).lower() in ("other", "o", "2"):
         sex_int = 2
 
-    patient_identifier = f"PT-{uuid.uuid4().hex[:8].upper()}"
+    patient_identifier = (
+        f"ANON-{uuid.uuid4().hex[:8].upper()}"
+        if deployment_mode.is_informational_mode()
+        else f"PT-{uuid.uuid4().hex[:8].upper()}"
+    )
     patient = models.Patient(
         patient_identifier=patient_identifier,
         hospital_id=hospital_id,
@@ -1672,6 +1686,12 @@ def doctor_confirm_encounter(
     db: Session = Depends(get_db),
     u=Depends(require(*CLINICAL_ROLES))
 ):
+    if deployment_mode.is_informational_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Doctor confirmation workflow is disabled in Informational Mode. Only available in Clinical Mode."
+        )
+
     if u.role == "hospital_staff":
         raise HTTPException(403, "Staff cannot mark records confirmed. Only attending doctors may confirm diagnoses.")
 
@@ -1877,9 +1897,23 @@ def trigger_federated_round(
     u: models.User = Depends(require("global_admin"))
 ):
     """Global admin triggers a hierarchical federated learning round across all hubs and hospitals."""
+    if deployment_mode.is_informational_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Federated training rounds are disabled in Informational Mode. Only available in Clinical Mode."
+        )
     cfg = body.model_dump() if hasattr(body, "model_dump") else body.dict()
     result = federated_learning.run_hierarchical_federated_round(db=db, config=cfg)
     return result
+
+
+@router.get("/system/mode")
+def get_system_mode():
+    """Returns the current deployment mode and persistent educational disclaimer."""
+    return {
+        "mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER
+    }
 
 
 @router.get("/federated/models")

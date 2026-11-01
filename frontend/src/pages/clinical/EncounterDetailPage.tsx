@@ -23,7 +23,7 @@ const COMMON_DIAGNOSES = [
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, appMode } = useAuthStore();
 
   const [encounter, setEncounter] = useState<ClinicalEncounter | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,7 +150,12 @@ export default function EncounterDetailPage() {
         </button>
 
         <div className="flex items-center gap-2">
-          {isConfirmed ? (
+          {appMode === 'informational' ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+              <Lock size={13} className="text-blue-600" />
+              Informational Mode · Untrainable
+            </span>
+          ) : isConfirmed ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
               <CheckCircle2 size={13} className="text-emerald-600" />
               Doctor Confirmed · Trainable
@@ -477,7 +482,7 @@ export default function EncounterDetailPage() {
             {/* Mandatory Disclaimer */}
             <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] text-amber-900 font-medium flex items-center gap-2">
               <AlertCircle size={15} className="text-amber-600 shrink-0" />
-              <span>{encounter.disclaimer || 'Clinical decision support only, not a diagnosis.'}</span>
+              <span>{encounter.disclaimer || 'Educational decision support. Not medical advice. Not clinically validated. In an emergency call your local emergency number.'}</span>
             </div>
 
             {/* Model Version & Fallback Indicator */}
@@ -534,7 +539,19 @@ export default function EncounterDetailPage() {
           </div>
         )}
 
-        {isConfirmed ? (
+        {appMode === 'informational' ? (
+          /* Informational Mode Notice */
+          <div className="p-6 rounded-2xl bg-blue-50/70 border border-blue-200 text-blue-900 space-y-3">
+            <div className="flex items-center gap-2 font-bold text-sm text-blue-900">
+              <Lock size={18} className="text-blue-700" />
+              Doctor Confirmation Workflow Disabled (Informational Mode)
+            </div>
+            <p className="text-xs text-blue-800 leading-relaxed">
+              TrustFed is operating in <strong>Informational Mode</strong> for educational prototype evaluation.
+              Physician diagnostic confirmation and trainable record verification are disabled until Clinical Mode is enabled.
+            </p>
+          </div>
+        ) : isConfirmed ? (
           /* View Mode for Confirmed Record */
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

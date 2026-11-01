@@ -11,8 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["SECRET_KEY"] = "phase4-super-secure-production-ready-key-2026-test"
 os.environ["ENVIRONMENT"] = "development"
+os.environ["APP_MODE"] = "clinical"
 
 from main import app
+from core.deployment_mode import PERSISTENT_DISCLAIMER
 from db.database import Base, engine, SessionLocal
 from db import models
 from db.migrations.v2_general_disease_migration import migrate_up
@@ -55,6 +57,10 @@ def setup_module(module):
         db.commit()
     finally:
         db.close()
+
+
+def teardown_module(module):
+    os.environ["APP_MODE"] = "informational"
 
 
 def _login(email: str) -> str:
@@ -338,14 +344,14 @@ def test_suggested_cause_and_remedies_label():
 # ── 7. Mandatory Clinical Disclaimer ──────────────────────────────────────────
 
 def test_mandatory_disclaimer_present():
-    """Disclaimer 'Clinical decision support only, not a diagnosis.' must be on every prediction."""
+    """Educational decision support disclaimer must be on every prediction."""
     res = general_disease_model.predict_differential(
         age=30,
         sex=0,
         symptoms=["headache"],
         vitals={}
     )
-    assert res.get("disclaimer") == "Clinical decision support only, not a diagnosis."
+    assert res.get("disclaimer") == PERSISTENT_DISCLAIMER
 
 
 # ── 8. Deterministic Evaluation Script ─────────────────────────────────────────
@@ -393,11 +399,12 @@ def test_api_clinical_predict_endpoint():
     assert data["hasCriticalRedFlag"] is True
     assert len(data["redFlags"]) >= 2
     # Verify mandatory disclaimer
-    assert data["disclaimer"] == "Clinical decision support only, not a diagnosis."
+    assert data["disclaimer"] == PERSISTENT_DISCLAIMER
 
 
-def test_api_encounter_creation_logs_model_version():
+def test_api_encounter_creation_logs_model_version(monkeypatch):
     """Encounter creation must store the model version and evaluate red flags."""
+    monkeypatch.setenv("APP_MODE", "clinical")
     token = _login("p4_staff@trustfed.ai")
     res = client.post(
         "/api/v1/hospital/patients",
@@ -420,4 +427,4 @@ def test_api_encounter_creation_logs_model_version():
     # Meningitis rule triggered by fever + stiff neck
     rule_ids = [rf["ruleId"] for rf in enc["redFlags"]]
     assert "SUSPECTED_MENINGITIS" in rule_ids
-    assert enc["disclaimer"] == "Clinical decision support only, not a diagnosis."
+    assert enc["disclaimer"] == PERSISTENT_DISCLAIMER

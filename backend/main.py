@@ -27,6 +27,8 @@ limiter = Limiter(key_func=get_client_ip, default_limits=["120/minute"])
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from core.deployment_mode import validate_deployment_mode_on_startup
+    validate_deployment_mode_on_startup()
     auth.validate_secret_key_on_startup()
     from services import crypto
     crypto.validate_encryption_key_on_startup()
@@ -125,7 +127,8 @@ app.include_router(api_router)
 @app.get("/")
 @app.head("/")
 def root():
-    return {"message": "TrustFed-Health backend is running.", "status": "ok", "version": "2.0.0"}
+    from core.deployment_mode import get_app_mode
+    return {"message": "TrustFed-Health backend is running.", "status": "ok", "version": "2.0.0", "mode": get_app_mode()}
 
 
 @app.get("/health")
@@ -135,6 +138,7 @@ def root():
 @app.get("/api/v1/health")
 @app.head("/api/v1/health")
 def health(db: Session = Depends(get_db)):
+    from core.deployment_mode import get_app_mode
     db_status = "connected"
     try:
         db.execute(text("SELECT 1"))
@@ -143,5 +147,6 @@ def health(db: Session = Depends(get_db)):
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "mode": get_app_mode()
     }

@@ -30,7 +30,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login, isBackendWakingUp } = useAuthStore();
+  const { login, isBackendWakingUp, appMode } = useAuthStore();
   const navigate = useNavigate();
 
   const submitLogin = async (loginEmail: string, loginPassword: string) => {
@@ -236,7 +236,15 @@ export default function LoginPage() {
             <span>•</span>
             <span>DP-SGD (ε ≤ 1.84)</span>
             <span>•</span>
-            <span>Paillier HE (Research Module)</span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+              Mode: {appMode === 'clinical' ? 'Clinical' : 'Informational'}
+            </span>
+          </div>
+
+          <div className="mt-3 pt-2 border-t border-slate-100 text-center">
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              Educational decision support. Not medical advice. Not clinically validated. In an emergency call your local emergency number.
+            </p>
           </div>
           
         </Card>

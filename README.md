@@ -11,6 +11,41 @@ TrustFed-Health is an enterprise-grade federated learning platform for multi-con
 
 ---
 
+## 0. Deployment Modes: Informational vs. Clinical
+
+TrustFed operates under a dual-mode operational architecture designed to ensure full regulatory and safety separation between public/educational prototypes and production hospital deployments:
+
+```mermaid
+flowchart LR
+    Mode{"APP_MODE"}
+    Mode -->|informational (Default)| Info["Informational Mode\n• Educational Decision Support\n• Zero Patient PHI (Names/Contacts Blocked)\n• Persistent Emergency Disclaimer\n• Doctor Confirmation & Training Disabled\n• Permissive Startup"]
+    Mode -->|clinical (Explicit)| Clin["Clinical Mode\n• Multi-Tenant Hospital Integration\n• AES-256 Encrypted Patient PHI\n• Doctor Confirmation & Trainable Marking\n• Hierarchical DP Federated Learning\n• Strict Enterprise Preflight Checks"]
+```
+
+### Mode Comparison Matrix
+
+| Capability / Boundary | Informational Mode (`APP_MODE=informational`) | Clinical Mode (`APP_MODE=clinical`) |
+| :--- | :--- | :--- |
+| **Intended Use** | Educational decision-support prototype. | Multi-hospital federated clinical deployment. |
+| **Validation Status** | **Not clinically validated. Not medical advice.** | Verified on institutional clinical cohorts. |
+| **Patient Identifiers** | **Blocked.** No names or contacts collected or stored. Form fields hidden. | Permitted with AES-256 field-level encryption at rest. |
+| **Demographic Intake** | Anonymous tokens (`ANON-XXXX`), age band, sex, symptoms, vitals. | Hospital identifier (`PT-XXXX`), full clinical encounter record. |
+| **Doctor Confirmation** | **Disabled & Hidden.** Encounters cannot be confirmed. | **Enabled.** Licensed physicians confirm diagnoses and mark records trainable. |
+| **Federated Training** | **Disabled & Hidden.** Rounds cannot be triggered. | **Enabled.** Hierarchical DP-SGD federation across hubs. |
+| **Persistent Disclaimer** | Displayed on every page, result card, and API endpoint. | Standard clinical decision support notice. |
+| **Startup Preflight Gate** | Permissive: runs on local SQLite or cloud DB for demos. | **Strict Failure Gate.** Startup aborts if any requirement is unfulfilled. |
+
+### Enabling Clinical Mode: Enterprise Preflight Requirements
+
+Before `APP_MODE=clinical` can be deployed, the backend performs a cryptographic and operational preflight check. It will **REFUSE TO START** (`RuntimeError`) unless all of the following flags are satisfied:
+
+1. **`MANAGED_DB_BACKUPS_CONFIRMED=true`**: Confirms that PostgreSQL is running on a managed enterprise cluster (e.g. Supabase, AWS RDS, Neon) with automated daily backups and Point-In-Time Recovery (PITR). SQLite is strictly prohibited.
+2. **`MFA_REQUIRED=true`**: Confirms that Multi-Factor Authentication is enforced across all medical staff and administrative accounts.
+3. **`ALLOW_DEMO_USERS=false`**: Prohibits 1-click test credentials and hardcoded demo passwords (`DEMO_USERS` seeding is bypassed).
+4. **`PATIENT_ENCRYPTION_KEY` & `SECRETS_STORE_MANAGED=true`**: Valid 32-byte URL-safe base64 encryption key confirmed to originate from a persistent enterprise secrets manager (e.g. AWS Secrets Manager, Render Persistent Secrets, HashiCorp Vault).
+
+---
+
 ## 1. Architectural Topology & Hierarchy
 
 TrustFed-Health operates across three distinct operational tiers to strictly segregate sensitive clinical data from federated aggregation:

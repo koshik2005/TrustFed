@@ -9,13 +9,19 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   isBackendWakingUp: boolean;
+  appMode: 'informational' | 'clinical';
 
   login: (user: User, token: string, csrfToken?: string) => void;
   setTokens: (token: string, csrfToken?: string) => void;
   setBackendWakingUp: (waking: boolean) => void;
+  setAppMode: (mode: 'informational' | 'clinical') => void;
+  fetchSystemMode: () => Promise<void>;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
 }
+
+const defaultAppMode: 'informational' | 'clinical' =
+  (import.meta.env.VITE_APP_MODE === 'clinical') ? 'clinical' : 'informational';
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -26,6 +32,27 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
       isBackendWakingUp: false,
+      appMode: defaultAppMode,
+
+      setAppMode: (appMode: 'informational' | 'clinical') => {
+        set({ appMode });
+      },
+
+      fetchSystemMode: async () => {
+        try {
+          const { getBaseUrl } = await import('../services/config');
+          const axios = (await import('axios')).default;
+          const base = getBaseUrl().replace(/\/api$/, '');
+          const res = await axios.get<{ mode?: string }>(`${base}/health`);
+          if (res.data?.mode === 'clinical') {
+            set({ appMode: 'clinical' });
+          } else if (res.data?.mode === 'informational') {
+            set({ appMode: 'informational' });
+          }
+        } catch {
+          // Keep current fallback mode on network error
+        }
+      },
 
       login: (user: User, token: string, csrfToken?: string) => {
         set({
@@ -67,6 +94,9 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       initializeAuth: async () => {
+        // Query backend mode asynchronously
+        get().fetchSystemMode().catch(() => {});
+
         const { isAuthenticated, user, csrfToken } = get();
         // If not authenticated, nothing to restore
         if (!isAuthenticated && !user) return;

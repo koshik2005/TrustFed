@@ -87,3 +87,4 @@ if __name__ == "__main__":
     from db.database import engine
     result = enable_row_level_security(engine)
     print("Migration result:", result)
+

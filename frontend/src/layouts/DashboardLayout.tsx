@@ -34,13 +34,19 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
 };
 
 export default function DashboardLayout() {
-  const { user, logout, isBackendWakingUp } = useAuthStore();
+  const { user, logout, isBackendWakingUp, appMode } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const allowedNavItems = NAV_ITEMS.filter((item) =>
-    user?.role ? item.roles.includes(user.role) : false
-  );
+  const allowedNavItems = NAV_ITEMS.filter((item) => {
+    // In Informational Mode, doctor confirmation and federated training are hidden
+    if (appMode === 'informational') {
+      if (item.id === 'pending-confirmations' || item.id === 'training') {
+        return false;
+      }
+    }
+    return user?.role ? item.roles.includes(user.role) : false;
+  });
 
   const handleLogout = () => {
     logout();
@@ -164,11 +170,15 @@ export default function DashboardLayout() {
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-slate-50">
-        {/* Visible Demo Environment Banner */}
+        {/* Visible Environment & Mode Banner */}
         <div className="bg-amber-400 text-amber-950 px-4 py-1.5 text-xs font-semibold flex items-center justify-between border-b border-amber-500/30 flex-shrink-0">
-          <div className="flex items-center gap-2 mx-auto">
+          <div className="flex items-center gap-2 mx-auto text-center">
             <span className="text-sm">⚠️</span>
-            <span>DEMO ENVIRONMENT — Synthetic clinical and federated data only. Real PHI is prohibited.</span>
+            <span>
+              {appMode === 'clinical'
+                ? "DEMO ENVIRONMENT (CLINICAL MODE) — Consented Hospital Data. Protected Health Information encrypted at rest."
+                : "DEMO ENVIRONMENT (INFORMATIONAL MODE) — Educational decision support. Synthetic clinical and federated data only. Real patient identifiers are prohibited."}
+            </span>
           </div>
         </div>
 
@@ -231,6 +241,27 @@ export default function DashboardLayout() {
           )}
           <Outlet />
         </main>
+
+        {/* Persistent Educational & Regulatory Disclaimer Footer */}
+        <footer className="w-full bg-white border-t border-slate-200 px-4 py-2.5 text-xs text-slate-500 flex flex-col md:flex-row items-center justify-between gap-2 flex-shrink-0 z-10 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                appMode === 'clinical'
+                  ? "bg-purple-100 text-purple-800 border border-purple-200"
+                  : "bg-blue-100 text-blue-800 border border-blue-200"
+              )}
+            >
+              Mode: {appMode === 'clinical' ? 'Clinical (Consented Live Data)' : 'Informational (Educational Prototype)'}
+            </span>
+            <span className="text-[11px] text-slate-400">|</span>
+            <span className="text-[11px] font-mono text-slate-500">v2.0.0</span>
+          </div>
+          <p className="text-[11px] text-slate-600 text-center md:text-right font-medium">
+            Educational decision support. Not medical advice. Not clinically validated. In an emergency call your local emergency number.
+          </p>
+        </footer>
       </div>
     </div>
   );

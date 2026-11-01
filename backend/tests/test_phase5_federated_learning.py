@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["SECRET_KEY"] = "phase5-super-secure-production-ready-key-2026-test"
 os.environ["ENVIRONMENT"] = "development"
+os.environ["APP_MODE"] = "clinical"
 
 from main import app
 from db.database import Base, engine, SessionLocal
@@ -163,6 +164,10 @@ def setup_module(module):
 
     finally:
         db.close()
+
+
+def teardown_module(module):
+    os.environ["APP_MODE"] = "informational"
 
 
 def _login(email: str) -> str:
@@ -606,7 +611,7 @@ def test_optional_deidentified_sharing_consent_guard():
 
 # ── Test 8: Simulated 3 Hospitals and 2 Hubs Hierarchical Round ─────────────────
 
-def test_simulated_3_hospitals_2_hubs_hierarchical_round():
+def test_simulated_3_hospitals_2_hubs_hierarchical_round(monkeypatch):
     """Simulate a complete multi-tier hierarchical federated round:
     - Tier 1: 3 Hospitals train locally using DP-SGD.
     - Tier 2: 2 Regional Hubs aggregate their hospital models.
@@ -614,6 +619,7 @@ def test_simulated_3_hospitals_2_hubs_hierarchical_round():
     - Promotion Gate evaluates candidate model against held-out validation cohort.
     - Audit Ledger records round events.
     """
+    monkeypatch.setenv("APP_MODE", "clinical")
     db = SessionLocal()
     try:
         # Trigger round via Global Admin API

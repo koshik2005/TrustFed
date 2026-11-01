@@ -5,11 +5,13 @@ import {
   Activity, ArrowRight, ShieldCheck, CheckCircle2, Loader2, Sparkles
 } from 'lucide-react';
 import { clinicalApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import type { ClinicalSymptom, ClinicalVitals } from '@/types';
 import { cn } from '@/utils';
 
 export default function NewPatientEncounterPage() {
   const navigate = useNavigate();
+  const { appMode } = useAuthStore();
 
   // Symptoms taxonomy from server
   const [availableSymptoms, setAvailableSymptoms] = useState<ClinicalSymptom[]>([]);
@@ -134,8 +136,8 @@ export default function NewPatientEncounterPage() {
 
     try {
       const res = await clinicalApi.registerPatient({
-        name: name.trim() || undefined,
-        contact: contact.trim() || undefined,
+        name: appMode === 'clinical' && name.trim() ? name.trim() : undefined,
+        contact: appMode === 'clinical' && contact.trim() ? contact.trim() : undefined,
         age: Number(age),
         sex,
         weight: weight !== '' ? Number(weight) : undefined,
@@ -207,39 +209,50 @@ export default function NewPatientEncounterPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Full Name <span className="text-slate-400 font-normal">(Optional)</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. John Doe"
-                className={cn(
-                  "w-full px-3.5 py-2 rounded-xl text-sm border bg-slate-50/50 transition-all focus:bg-white focus:outline-none focus:ring-2",
-                  errors.name ? "border-rose-300 focus:ring-rose-200" : "border-slate-200 focus:ring-blue-100 focus:border-blue-500"
-                )}
-              />
-              {errors.name && <p className="text-xs text-rose-600 mt-1">{errors.name}</p>}
-            </div>
+            {appMode === 'informational' ? (
+              <div className="col-span-1 md:col-span-2 p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <span className="leading-relaxed">
+                  <strong>Informational Mode Active:</strong> Direct patient identifiers (full name, phone, email) are not collected. All records are processed anonymously.
+                </span>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Full Name <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. John Doe"
+                    className={cn(
+                      "w-full px-3.5 py-2 rounded-xl text-sm border bg-slate-50/50 transition-all focus:bg-white focus:outline-none focus:ring-2",
+                      errors.name ? "border-rose-300 focus:ring-rose-200" : "border-slate-200 focus:ring-blue-100 focus:border-blue-500"
+                    )}
+                  />
+                  {errors.name && <p className="text-xs text-rose-600 mt-1">{errors.name}</p>}
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Contact Phone / Email <span className="text-slate-400 font-normal">(Optional)</span>
-              </label>
-              <input
-                type="text"
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                placeholder="e.g. +1-555-0199"
-                className={cn(
-                  "w-full px-3.5 py-2 rounded-xl text-sm border bg-slate-50/50 transition-all focus:bg-white focus:outline-none focus:ring-2",
-                  errors.contact ? "border-rose-300 focus:ring-rose-200" : "border-slate-200 focus:ring-blue-100 focus:border-blue-500"
-                )}
-              />
-              {errors.contact && <p className="text-xs text-rose-600 mt-1">{errors.contact}</p>}
-            </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Contact Phone / Email <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={contact}
+                    onChange={(e) => setContact(e.target.value)}
+                    placeholder="e.g. +1-555-0199"
+                    className={cn(
+                      "w-full px-3.5 py-2 rounded-xl text-sm border bg-slate-50/50 transition-all focus:bg-white focus:outline-none focus:ring-2",
+                      errors.contact ? "border-rose-300 focus:ring-rose-200" : "border-slate-200 focus:ring-blue-100 focus:border-blue-500"
+                    )}
+                  />
+                  {errors.contact && <p className="text-xs text-rose-600 mt-1">{errors.contact}</p>}
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
