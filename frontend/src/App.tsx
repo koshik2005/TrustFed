@@ -173,7 +173,7 @@ export default function App() {
               path="regional"
               element={
                 <RoleRoute allowedRoles={['regional_admin', 'global_admin']}>
-                  <RegionalDashboard />
+                  <RegionalPage />
                 </RoleRoute>
               }
             />
