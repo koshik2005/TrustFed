@@ -1384,6 +1384,11 @@ def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.Use
         store.add_audit(db, s.session_id, u.email, "prediction",
                         f"Risk prediction {pid}: {r['riskLabel']} ({r['riskScore']:.2f}) [Model: {s.session_id}]")
         predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=False)
+        from core.model_monitoring import model_monitor
+        model_monitor.record_inference(
+            model_version=s.session_id or "pretrained-cleveland",
+            top3_confidences=[r.get("confidence", 0.0)]
+        )
         return _pred_json(row)
     except Exception:
         predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=True)
@@ -1399,6 +1404,59 @@ def prediction_metrics():
         "prediction_latency": predict_latency_tracker.get_metrics(),
         "mode": deployment_mode.get_app_mode(),
     }
+
+
+@router.get("/model/monitoring")
+@router.get("/monitoring/model")
+def model_monitoring_dashboard():
+    """Returns model versions, top-3 confidence distribution, red-flag override rate, and drift alerts."""
+    from core.model_monitoring import model_monitor
+    return model_monitor.get_monitoring_report()
+
+
+@router.get("/monitoring/sentry-test")
+@router.post("/monitoring/sentry-test")
+def trigger_sentry_test():
+    """Triggers a controlled test event to verify Sentry event ingestion and PHI scrubbing."""
+    import sentry_sdk
+    from core.logging_config import before_send_scrubber
+    dsn_configured = bool(os.getenv("SENTRY_DSN"))
+    test_event = {
+        "message": "TrustFed Sentry Ingestion Test: Checking PHI scrubbing for PT-88899 and phone 555-0199",
+        "request": {
+            "url": "https://trustfed-backend.onrender.com/api/v1/patients/PT-88899",
+            "headers": {"Authorization": "Bearer secret-token-xyz"}
+        }
+    }
+    scrubbed = before_send_scrubber(test_event, {})
+    event_id = None
+    if dsn_configured:
+        try:
+            event_id = sentry_sdk.capture_message("TrustFed Verification Test Event (PHI Scrubbed)")
+        except Exception as e:
+            event_id = f"Error capturing Sentry event: {e}"
+    return {
+        "status": "ok",
+        "sentry_dsn_configured": dsn_configured,
+        "event_id": event_id,
+        "scrubbed_sample": scrubbed
+    }
+
+
+class RedFlagOverrideBody(BaseModel):
+    date: Optional[str] = None
+
+
+@router.post("/model/monitoring/override")
+@router.post("/monitoring/model/override")
+def record_model_override(
+    body: Optional[RedFlagOverrideBody] = None,
+    u: models.User = Depends(require(*DOCTOR_ROLES))
+):
+    """Records an explicit clinician override of an automated emergency red flag."""
+    from core.model_monitoring import model_monitor
+    model_monitor.record_override(body.date if body else None)
+    return {"message": "Clinician red-flag override recorded successfully"}
 
 
 @router.get("/prediction/history")
@@ -1706,6 +1764,15 @@ def predict_clinical_differential(
             hospital_confirmed_records=hospital_records
         )
         predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=False)
+        from core.model_monitoring import model_monitor
+        top3_confs = [item.get("confidence", 0.0) for item in diff_res.get("topDifferential", [])[:3]]
+        has_rf = len(diff_res.get("redFlags", [])) > 0
+        model_ver = diff_res.get("modelVersion", "v2-general-disease-2026")
+        model_monitor.record_inference(
+            model_version=model_ver,
+            top3_confidences=top3_confs,
+            has_red_flag=has_rf
+        )
     except Exception:
         predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=True)
         raise

@@ -87,3 +87,4 @@ def decrypt_mfa_secret(encrypted_secret: Optional[str]) -> Optional[str]:
         return crypto.decrypt_phi(encrypted_secret)
     except Exception:
         return None
+

@@ -5,3 +5,4 @@ Preferred-Languages: en
 Canonical: https://frontend-3qgo.vercel.app/.well-known/security.txt
 Policy: https://frontend-3qgo.vercel.app/security
 Acknowledgments: https://frontend-3qgo.vercel.app/hall-of-fame
+

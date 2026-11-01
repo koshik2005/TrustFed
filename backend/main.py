@@ -92,8 +92,9 @@ def _get_cors_origins() -> list[str]:
     ]
 
 
+import uuid
 from fastapi.middleware.gzip import GZipMiddleware
-from core.logging_config import init_monitoring_and_logging
+from core.logging_config import init_monitoring_and_logging, request_id_ctx
 
 # Initialize structured logging with PHI redaction and Sentry error monitoring
 init_monitoring_and_logging()
@@ -107,6 +108,18 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    token = request_id_ctx.set(req_id)
+    try:
+        response: Response = await call_next(request)
+        response.headers["X-Request-ID"] = req_id
+        return response
+    finally:
+        request_id_ctx.reset(token)
 
 
 @app.middleware("http")

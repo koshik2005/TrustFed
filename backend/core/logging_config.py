@@ -6,6 +6,7 @@ Features:
 - Sentry Error Monitoring: Opt-in via SENTRY_DSN with send_default_pii=False and before_send scrubbing.
 """
 from __future__ import annotations
+import contextvars
 import json
 import logging
 import os
@@ -13,27 +14,37 @@ import re
 import sys
 from typing import Any, Dict, Optional
 
-# PHI Redaction Regex Patterns
+# Context variable for request correlation IDs across async requests
+request_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("request_id", default=None)
+
+# PHI & Secret Redaction Regex Patterns
 PATIENT_ID_PATTERN = re.compile(r"PT-[A-Za-z0-9\-_]{3,}", re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 PHONE_PATTERN = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{4}")
 TOKEN_PATTERN = re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE)
+JWT_PATTERN = re.compile(r"eyJ[A-Za-z0-9\-_]{10,}\.eyJ[A-Za-z0-9\-_]{10,}\.[A-Za-z0-9\-_]+", re.IGNORECASE)
+TOKEN_PARAM_PATTERN = re.compile(r"(?:token|csrf_token|tf_refresh_token|mfa_token|secret_key)\s*[:=]\s*['\"]?([A-Za-z0-9\-._~+/]{10,})['\"]?", re.IGNORECASE)
+NAME_FIELD_PATTERN = re.compile(r"(?:patient[_\s]?name|name)\s*[:=]\s*['\"]([A-Za-z\s]{2,40})['\"]", re.IGNORECASE)
 
 
 def redact_phi_text(text: str) -> str:
-    """Scrubs patient identifiers, phone numbers, and tokens from any string."""
+    """Scrubs patient identifiers, names, phone numbers, and tokens from any string."""
     if not isinstance(text, str):
         return text
     text = PATIENT_ID_PATTERN.sub("[REDACTED_PATIENT_ID]", text)
     text = PHONE_PATTERN.sub("[REDACTED_PHONE]", text)
     text = TOKEN_PATTERN.sub("Bearer [REDACTED_TOKEN]", text)
+    text = JWT_PATTERN.sub("[REDACTED_JWT]", text)
+    text = TOKEN_PARAM_PATTERN.sub("token=[REDACTED_TOKEN]", text)
+    text = NAME_FIELD_PATTERN.sub('name="[REDACTED_NAME]"', text)
     return text
 
 
 class PHIRedactionFilter(logging.Filter):
-    """Logging filter ensuring patient identifiers never appear in server log sinks."""
+    """Logging filter ensuring patient identifiers and tokens never appear in server log sinks."""
 
     def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_ctx.get() or getattr(record, "request_id", "-")
         if isinstance(record.msg, str):
             record.msg = redact_phi_text(record.msg)
         if record.args:
@@ -45,17 +56,19 @@ class PHIRedactionFilter(logging.Filter):
 
 
 class JSONLogFormatter(logging.Formatter):
-    """Structured JSON formatter with timestamp, level, module, and sanitized message."""
+    """Structured JSON formatter with timestamp, level, request_id, logger, and sanitized message."""
 
     def format(self, record: logging.LogRecord) -> str:
         try:
             msg = record.getMessage()
         except Exception:
             msg = str(record.msg)
+        req_id = request_id_ctx.get() or getattr(record, "request_id", "-")
         data: Dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
             "logger": record.name,
+            "request_id": req_id or "-",
             "message": redact_phi_text(msg),
         }
         if record.exc_info:
@@ -107,7 +120,7 @@ def init_monitoring_and_logging() -> None:
     if env in ("production", "prod"):
         handler.setFormatter(JSONLogFormatter())
     else:
-        fmt = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s")
+        fmt = logging.Formatter("[%(asctime)s] [%(levelname)s] [req:%(request_id)s] [%(name)s]: %(message)s")
         handler.setFormatter(fmt)
 
     root.addHandler(handler)

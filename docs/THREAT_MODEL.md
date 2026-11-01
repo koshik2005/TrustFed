@@ -118,3 +118,4 @@ TrustFed maintains a public `security.txt` file located at:
 - `https://frontend-3qgo.vercel.app/.well-known/security.txt`
 
 To report security vulnerabilities, email **security@trustfed.ai**. Disclosures are acknowledged within 24 hours with remediation updates provided every 48 hours until patched.
+
