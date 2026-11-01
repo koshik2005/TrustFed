@@ -34,6 +34,14 @@ const EncounterDetailPage      = lazy(() => import('@/pages/clinical/EncounterDe
 const PendingConfirmationsPage = lazy(() => import('@/pages/clinical/PendingConfirmationsPage'));
 
 import ForcePasswordResetModal from '@/components/auth/ForcePasswordResetModal';
+import PublicLayout from '@/layouts/PublicLayout';
+
+// Public Legal & Transparency Pages (Crawlable & Accessible without Auth)
+const TermsPage = lazy(() => import('@/pages/public/TermsPage'));
+const PrivacyPolicyPage = lazy(() => import('@/pages/public/PrivacyPolicyPage'));
+const MedicalDisclaimerPage = lazy(() => import('@/pages/public/MedicalDisclaimerPage'));
+const GrievancePage = lazy(() => import('@/pages/public/GrievancePage'));
+const IntendedUsePage = lazy(() => import('@/pages/public/IntendedUsePage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -58,10 +66,20 @@ export default function App() {
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
-          {/* Public */}
+          {/* Public Authentication & Error */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/403" element={<Forbidden403 />} />
           <Route path="/404" element={<NotFound404 />} />
+
+          {/* Public Legal & Regulatory Pages (Accessible & Crawlable without Auth) */}
+          <Route element={<PublicLayout />}>
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/disclaimer" element={<MedicalDisclaimerPage />} />
+            <Route path="/grievance" element={<GrievancePage />} />
+            <Route path="/contact" element={<GrievancePage />} />
+            <Route path="/intended-use" element={<IntendedUsePage />} />
+          </Route>
 
           {/* Protected — all inside DashboardLayout */}
           <Route

@@ -22,18 +22,22 @@ flowchart LR
     Mode -->|clinical (Explicit)| Clin["Clinical Mode\n• Multi-Tenant Hospital Integration\n• AES-256 Encrypted Patient PHI\n• Doctor Confirmation & Trainable Marking\n• Hierarchical DP Federated Learning\n• Strict Enterprise Preflight Checks"]
 ```
 
-### Mode Comparison Matrix
+### Mode Comparison Matrix & Mandatory Prerequisites for Clinical Mode
 
-| Capability / Boundary | Informational Mode (`APP_MODE=informational`) | Clinical Mode (`APP_MODE=clinical`) |
-| :--- | :--- | :--- |
-| **Intended Use** | Educational decision-support prototype. | Multi-hospital federated clinical deployment. |
-| **Validation Status** | **Not clinically validated. Not medical advice.** | Verified on institutional clinical cohorts. |
-| **Patient Identifiers** | **Blocked.** No names or contacts collected or stored. Form fields hidden. | Permitted with AES-256 field-level encryption at rest. |
-| **Demographic Intake** | Anonymous tokens (`ANON-XXXX`), age band, sex, symptoms, vitals. | Hospital identifier (`PT-XXXX`), full clinical encounter record. |
-| **Doctor Confirmation** | **Disabled & Hidden.** Encounters cannot be confirmed. | **Enabled.** Licensed physicians confirm diagnoses and mark records trainable. |
-| **Federated Training** | **Disabled & Hidden.** Rounds cannot be triggered. | **Enabled.** Hierarchical DP-SGD federation across hubs. |
-| **Persistent Disclaimer** | Displayed on every page, result card, and API endpoint. | Standard clinical decision support notice. |
-| **Startup Preflight Gate** | Permissive: runs on local SQLite or cloud DB for demos. | **Strict Failure Gate.** Startup aborts if any requirement is unfulfilled. |
+| Dimension / Requirement | Informational Mode (`APP_MODE=informational`) [ACTIVE] | Clinical Mode (`APP_MODE=clinical`) [NOT ACTIVE] | Mandatory Preconditions Before Clinical Mode Can Be Enabled |
+| :--- | :--- | :--- | :--- |
+| **Intended Purpose** | Educational decision-support prototype & algorithmic benchmark. | Multi-center hospital clinical decision support. | **Regulatory Advice & Clearance**: Formal advisory review from healthcare regulatory counsel. |
+| **Medical Device Status** | **NOT a certified medical device. Not medical advice.** | Clinical decision-support system. | **No Device Claims**: Must obtain formal SaMD clearance before live deployment. |
+| **Clinical Content Verification** | Prototype heuristics labeled *"Pending Physician Review"*. | Validated institutional clinical guidelines. | **Doctor Review**: Formal clinical board sign-off on all 18 diseases, red-flag thresholds, and remedy recommendations. |
+| **Patient Data Ingestion** | **Zero Identifiable Data.** Names and contact numbers completely blocked. | Consented patient encounter data with field encryption. | **Consented Hospital Data**: Institutional Review Board (IRB) approved informed consent workflows. |
+| **Operational Validation** | Public & synthetic benchmark testing ($N=1,080$). | Live clinical decision-support inference. | **Shadow-Mode Validation**: Minimum 90-day shadow-mode parallel run against gold-standard clinical diagnoses with zero regressions. |
+| **Legal Agreements** | Open prototype terms & public draft policies. | Institutional business and consortium contracts. | **Consortium Legal Agreements**: Fully executed hospital data-sharing agreements, liability allocation, and grievance redressal contracts. |
+| **Doctor Confirmation** | **Disabled & Hidden.** Encounters cannot be confirmed. | **Enabled.** Attending physicians confirm diagnoses. | Mandatory physician training and institutional credentialing. |
+| **Federated Training** | **Disabled & Hidden.** Training rounds cannot be triggered. | **Enabled.** Local DP-SGD weight federation. | Minimum hospital quorum and DP privacy budget ($\varepsilon \le 1.84$) verification. |
+| **Startup Gate** | Permissive: runs on local dev or cloud database. | **Strict Failure Gate.** Aborts if any requirement is unfulfilled. | Managed PostgreSQL with automated backups, MFA enforced, demo accounts disabled, secrets manager key. |
+
+> [!CAUTION]
+> **No Regulatory Compliance Claims**: TrustFed does NOT claim certified compliance with DPDP, HIPAA, GDPR, or Software as a Medical Device (SaMD) standards. Any future clinical deployment requires independent third-party statutory audit, legal advice, and regulatory clearance.
 
 ### Enabling Clinical Mode: Enterprise Preflight Requirements
 
@@ -211,7 +215,7 @@ TrustFed uses environment variables to configure operational mode, cryptography,
 | **User Onboarding** | 1-Click quick sign-in buttons for all roles | Formal institutional credential provisioning only; zero self-registration |
 | **Passwords** | Default demo password permitted | Strong policy ($\ge 8$ chars, mixed case, numbers, symbols) + forced first-login reset |
 | **Database** | Lightweight local SQLite (`trustfed.db`) | Managed PostgreSQL with TLS and automated backups |
-| **Patient Data** | Synthetic clinical benchmark cohorts | Real EHR intake with AES-128 Fernet encryption at rest and DPDP erasure |
+| **Patient Data** | Synthetic clinical benchmark cohorts | Real EHR intake with AES-128 Fernet encryption at rest and cryptographic deletion |
 | **Cookies** | Secure flag optional on localhost | Mandatory `Secure; HttpOnly; SameSite=Lax` via Vercel first-party proxy |
 | **Security Headers** | Basic CORS | Mandatory HSTS (1 year), CSP, X-Frame-Options DENY, nosniff, Referrer-Policy |
 

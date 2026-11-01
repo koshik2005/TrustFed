@@ -1432,6 +1432,89 @@ def get_model_info():
     }
 
 
+# ── Public Legal & Regulatory Endpoints (Drafts for Lawyer Review) ────────────
+
+def _load_legal_doc(filename: str) -> str:
+    # __file__ is backend/api/v1/routes.py -> 4 levels up to reach project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    path = os.path.join(project_root, "docs", "legal", filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return f"# {filename}\nDraft pending legal review."
+
+
+@router.get("/legal/terms")
+def get_terms_of_use():
+    return {
+        "status": "ok",
+        "document": "Terms of Use",
+        "review_status": "DRAFT, pending legal review",
+        "operating_mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER,
+        "content": _load_legal_doc("TERMS_OF_USE.md")
+    }
+
+
+@router.get("/legal/privacy")
+def get_privacy_policy():
+    return {
+        "status": "ok",
+        "document": "Privacy Policy",
+        "review_status": "DRAFT, pending legal review",
+        "operating_mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER,
+        "cookie_policy": "Strictly essential authentication/session cookies only. Zero tracking or advertising cookies.",
+        "content": _load_legal_doc("PRIVACY_POLICY.md")
+    }
+
+
+@router.get("/legal/disclaimer")
+def get_medical_disclaimer():
+    return {
+        "status": "ok",
+        "document": "Medical Disclaimer",
+        "review_status": "DRAFT, pending legal review",
+        "operating_mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER,
+        "content": _load_legal_doc("MEDICAL_DISCLAIMER.md")
+    }
+
+
+@router.get("/legal/grievance")
+def get_grievance_policy():
+    return {
+        "status": "ok",
+        "document": "Contact & Grievance Redressal Policy",
+        "review_status": "DRAFT, pending legal review",
+        "operating_mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER,
+        "grievance_officer": {
+            "name": "Adv. Rajesh V. Sharma / Compliance Lead [Placeholder]",
+            "designation": "Nodal Grievance Redressal Officer",
+            "email": "grievance-officer@trustfed.ai",
+            "security_email": "security@trustfed.ai",
+            "address": "No. 42, Innovation Hub, Tech City, Bengaluru, Karnataka 560100, India [Placeholder]",
+            "acknowledgment_hours": 48,
+            "resolution_days": 15
+        },
+        "content": _load_legal_doc("GRIEVANCE_POLICY.md")
+    }
+
+
+@router.get("/legal/intended-use")
+def get_intended_use():
+    return {
+        "status": "ok",
+        "document": "Intended Use Specification",
+        "review_status": "DRAFT, pending legal review",
+        "operating_mode": deployment_mode.get_app_mode(),
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER,
+        "content": _load_legal_doc("INTENDED_USE.md")
+    }
+
+
+
 
 @router.get("/monitoring/sentry-test")
 @router.post("/monitoring/sentry-test")

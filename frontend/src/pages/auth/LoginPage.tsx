@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
+import PublicFooter from '@/components/common/PublicFooter';
 
 const DEMO_EMAIL: Record<UserRole, string> = {
   hospital_staff: 'hospital@trustfed.ai',
@@ -249,6 +250,11 @@ export default function LoginPage() {
           
         </Card>
       </motion.div>
+
+      {/* Persistent Legal and Emergency Footer on Login Page */}
+      <div className="w-full mt-auto relative z-10 pt-6">
+        <PublicFooter className="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 max-w-5xl mx-auto shadow-sm" />
+      </div>
     </div>
   );
 }
