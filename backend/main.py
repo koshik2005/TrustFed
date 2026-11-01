@@ -32,6 +32,8 @@ async def lifespan(app: FastAPI):
     crypto.validate_encryption_key_on_startup()
     from db.migrations.v2_general_disease_migration import migrate_up
     migrate_up(engine)
+    from db.migrations.enable_rls import enable_row_level_security
+    enable_row_level_security(engine)
     db = SessionLocal()
     try:
         from services import seed_data
