@@ -58,17 +58,17 @@ def current_user(authorization: Optional[str] = Header(None), db: Session = Depe
     if not u:
         raise HTTPException(401, "Unknown user")
 
-    # Immediate revocation check: user status
-    if u.status and u.status != "active":
-        raise HTTPException(401, "User account is suspended or inactive")
+    # Immediate revocation check: user status and soft-delete
+    if u.deleted_at is not None or (u.status and u.status != "active"):
+        raise HTTPException(401, "User account is suspended, deleted, or inactive")
 
-    # Immediate revocation check: hospital status
+    # Immediate revocation check: hospital status and soft-delete
     if u.hospital_id:
         hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
-        if hosp and hosp.status != "active":
+        if hosp and (hosp.deleted_at is not None or hosp.status != "active"):
             raise HTTPException(401, f"Hospital '{hosp.name}' is currently {hosp.status}")
 
-    # Immediate revocation check: regional hub status
+    # Immediate revocation check: regional hub status and soft-delete
     hub_id = u.hub_id
     if not hub_id and u.hospital_id:
         hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
@@ -76,7 +76,7 @@ def current_user(authorization: Optional[str] = Header(None), db: Session = Depe
             hub_id = hosp.hub_id
     if hub_id:
         hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
-        if hub and hub.status != "active":
+        if hub and (hub.deleted_at is not None or hub.status != "active"):
             raise HTTPException(401, f"Regional hub '{hub.name}' is currently {hub.status}")
 
     return u
@@ -137,7 +137,9 @@ def _user_json(u: models.User) -> Dict[str, Any]:
         "hospitalId": u.hospital_id,
         "hubId": u.hub_id,
         "mustResetPassword": bool(u.must_reset_password),
-        "status": u.status or "active"
+        "status": u.status or "active",
+        "mfaEnabled": bool(u.mfa_enabled),
+        "deletedAt": u.deleted_at.isoformat() if u.deleted_at else None,
     }
 
 
@@ -161,9 +163,12 @@ def revoke_user_tokens(db: Session, user_id: int):
 
 def cascade_hospital_suspension(db: Session, hospital_id: str, action: str = "suspend"):
     """Revokes tokens and sets hospital users and training node offline."""
+    now = datetime.datetime.now(datetime.timezone.utc)
     users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
     for usr in users:
-        usr.status = "suspended" if action == "suspend" else "removed"
+        usr.status = "suspended" if action == "suspend" else "deleted"
+        if action in ("delete", "remove"):
+            usr.deleted_at = now
         revoke_user_tokens(db, usr.id)
     node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
     if node:
@@ -176,9 +181,13 @@ def reactivate_hospital_cascade(db: Session, hospital_id: str):
     h = db.query(models.Hospital).filter_by(id=hospital_id).first()
     if h:
         h.status = "active"
+        h.deleted_at = None
+        h.deleted_by = None
     users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
     for usr in users:
         usr.status = "active"
+        usr.deleted_at = None
+        usr.deleted_by = None
     node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
     if node:
         node.status = "idle"
@@ -187,13 +196,18 @@ def reactivate_hospital_cascade(db: Session, hospital_id: str):
 
 def cascade_hub_suspension(db: Session, hub_id: str, action: str = "suspend"):
     """Suspends regional admins and all dependent hospitals in the hub."""
+    now = datetime.datetime.now(datetime.timezone.utc)
     admins = db.query(models.User).filter_by(hub_id=hub_id).all()
     for a in admins:
-        a.status = "suspended" if action == "suspend" else "removed"
+        a.status = "suspended" if action == "suspend" else "deleted"
+        if action in ("delete", "remove"):
+            a.deleted_at = now
         revoke_user_tokens(db, a.id)
     hospitals = db.query(models.Hospital).filter_by(hub_id=hub_id).all()
     for h in hospitals:
-        h.status = "suspended" if action == "suspend" else "removed"
+        h.status = "suspended" if action == "suspend" else "deleted"
+        if action in ("delete", "remove"):
+            h.deleted_at = now
         cascade_hospital_suspension(db, h.id, action=action)
     db.commit()
 
@@ -225,6 +239,83 @@ def clear_account_failed_attempts(email: str) -> None:
     ACCOUNT_FAILED_ATTEMPTS.pop(email, None)
 
 
+class MfaSetupBody(BaseModel):
+    mfa_token: Optional[str] = None
+
+
+class MfaEnableBody(BaseModel):
+    code: str
+    mfa_token: Optional[str] = None
+
+
+class MfaVerifyBody(BaseModel):
+    mfa_token: str
+    code: str
+
+
+class MfaRecoveryBody(BaseModel):
+    mfa_token: str
+    recovery_code: str
+
+
+class MfaDisableBody(BaseModel):
+    code: str
+
+
+def _issue_authenticated_session(response: Response, request: Request, u: models.User, db: Session) -> dict:
+    tokens = auth.create_refresh_token_pair(
+        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id, hub_id=u.hub_id
+    )
+    exp_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
+    rf = models.RefreshToken(
+        user_id=u.id,
+        jti=tokens["jti"],
+        csrf_token=tokens["csrf_token"],
+        expires_at=exp_dt
+    )
+    db.add(rf)
+    db.commit()
+
+    response.set_cookie(
+        key="tf_refresh_token",
+        value=tokens["refresh_token"],
+        httponly=True,
+        secure=True,
+        samesite=_cookie_samesite(request),
+        path="/api",
+        max_age=7 * 86400,
+    )
+    return {
+        "token": tokens["access_token"],
+        "csrf_token": tokens["csrf_token"],
+        "user": _user_json(u)
+    }
+
+
+def resolve_mfa_user(
+    request: Request,
+    authorization: Optional[str] = None,
+    mfa_token: Optional[str] = None,
+    db: Session = None
+) -> models.User:
+    if authorization and authorization.lower().startswith("bearer "):
+        try:
+            return current_user(authorization=authorization, db=db)
+        except Exception:
+            pass
+    tok = mfa_token or request.headers.get("x-mfa-token")
+    if not tok:
+        raise HTTPException(401, "Authentication required: provide Bearer token or mfa_token")
+    try:
+        claims = auth.decode_token(tok, expected_type="mfa_pending")
+    except ValueError as e:
+        raise HTTPException(401, f"Invalid or expired MFA token: {e}")
+    u = db.query(models.User).filter_by(id=claims.get("user_id")).first()
+    if not u or u.deleted_at is not None or (u.status and u.status != "active"):
+        raise HTTPException(401, "User account is suspended, deleted, or inactive")
+    return u
+
+
 @router.post("/auth/login")
 @limiter.limit("20/minute")
 def login(request: Request, body: LoginBody, response: Response, db: Session = Depends(get_db)):
@@ -240,16 +331,13 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
         store.add_audit(db, None, client_ip, "auth", f"Failed login attempt for {norm_email[:60]}")
         raise HTTPException(401, "Invalid email or password")
 
-    # Clear account failures upon valid credentials
-    clear_account_failed_attempts(norm_email)
-
-    if u.status and u.status != "active":
-        store.add_audit(db, None, u.email, "auth", f"Login rejected: user account is {u.status}")
-        raise HTTPException(401, "User account is suspended or inactive")
+    if u.deleted_at is not None or (u.status and u.status != "active"):
+        store.add_audit(db, None, u.email, "auth", f"Login rejected: user account is {u.status or 'deleted'}")
+        raise HTTPException(401, "User account is suspended, deleted, or inactive")
 
     if u.hospital_id:
         hosp = db.query(models.Hospital).filter_by(id=u.hospital_id).first()
-        if hosp and hosp.status != "active":
+        if hosp and (hosp.deleted_at is not None or hosp.status != "active"):
             raise HTTPException(401, f"Hospital '{hosp.name}' is currently {hosp.status}")
 
     hub_id = u.hub_id
@@ -259,41 +347,197 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
             hub_id = hosp.hub_id
     if hub_id:
         hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
-        if hub and hub.status != "active":
+        if hub and (hub.deleted_at is not None or hub.status != "active"):
             raise HTTPException(401, f"Regional hub '{hub.name}' is currently {hub.status}")
 
-    # Issue short-lived access token + long-lived rotating refresh token + CSRF token
-    tokens = auth.create_refresh_token_pair(
-        user_id=u.id, email=u.email, role=u.role, hospital_id=u.hospital_id, hub_id=u.hub_id
-    )
+    # Clear account failures upon valid credentials
+    clear_account_failed_attempts(norm_email)
 
-    # Persist refresh token in database for rotation & revocation tracking
-    exp_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
-    rf = models.RefreshToken(
-        user_id=u.id,
-        jti=tokens["jti"],
-        csrf_token=tokens["csrf_token"],
-        expires_at=exp_dt
-    )
-    db.add(rf)
+    # MFA Challenge checks
+    mfa_mandatory = os.getenv("REQUIRE_MFA_MANDATORY", "false").strip().lower() in ("true", "1")
+    is_mfa_role = u.role in ("global_admin", "regional_admin", "doctor")
+
+    if u.mfa_enabled:
+        mfa_tok = auth.create_token(
+            {"sub": u.email, "user_id": u.id, "role": u.role},
+            ttl=300,
+            token_type="mfa_pending"
+        )
+        return {
+            "mfa_required": True,
+            "mfa_token": mfa_tok,
+            "user": _user_json(u)
+        }
+
+    if mfa_mandatory and is_mfa_role and not u.mfa_enabled:
+        mfa_tok = auth.create_token(
+            {"sub": u.email, "user_id": u.id, "role": u.role},
+            ttl=600,
+            token_type="mfa_pending"
+        )
+        return {
+            "mfa_required": True,
+            "mfa_setup_required": True,
+            "mfa_token": mfa_tok,
+            "user": _user_json(u)
+        }
+
+    session_data = _issue_authenticated_session(response, request, u, db)
+    store.add_audit(db, None, u.email, "auth", f"Login successful ({u.role})")
+    return session_data
+
+
+@router.post("/auth/mfa/setup")
+def mfa_setup(
+    request: Request,
+    body: Optional[MfaSetupBody] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    from services import mfa
+    u = resolve_mfa_user(request, authorization, body.mfa_token if body else None, db)
+    secret = mfa.generate_mfa_secret()
+    u.mfa_secret = mfa.encrypt_mfa_secret(secret)
+    db.commit()
+    uri = mfa.generate_provisioning_uri(u.email, secret)
+    return {
+        "secret": secret,
+        "otpauth_uri": uri
+    }
+
+
+@router.post("/auth/mfa/enable")
+def mfa_enable(
+    request: Request,
+    response: Response,
+    body: MfaEnableBody,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    from services import mfa
+    u = resolve_mfa_user(request, authorization, body.mfa_token, db)
+    if not u.mfa_secret:
+        raise HTTPException(400, "MFA setup has not been initiated. Call /auth/mfa/setup first.")
+    raw_secret = mfa.decrypt_mfa_secret(u.mfa_secret)
+    if not raw_secret or not mfa.verify_totp_code(raw_secret, body.code):
+        raise HTTPException(400, "Invalid MFA verification code")
+
+    plain_recovery_codes, hashed_codes_json = mfa.generate_recovery_codes(8)
+    u.mfa_enabled = True
+    u.mfa_recovery_codes = hashed_codes_json
+    db.commit()
+    store.add_audit(db, None, u.email, "mfa", f"MFA enabled with 8 recovery codes for {u.email}")
+
+    session_data = _issue_authenticated_session(response, request, u, db)
+    return {
+        "mfa_enabled": True,
+        "recovery_codes": plain_recovery_codes,
+        **session_data
+    }
+
+
+@router.post("/auth/mfa/verify")
+def mfa_verify(
+    request: Request,
+    response: Response,
+    body: MfaVerifyBody,
+    db: Session = Depends(get_db)
+):
+    from services import mfa
+    try:
+        claims = auth.decode_token(body.mfa_token, expected_type="mfa_pending")
+    except ValueError as e:
+        raise HTTPException(401, f"Invalid or expired MFA session: {e}")
+
+    u = db.query(models.User).filter_by(id=claims.get("user_id")).first()
+    if not u or u.deleted_at is not None or (u.status and u.status != "active"):
+        raise HTTPException(401, "User account is suspended, deleted, or inactive")
+
+    raw_secret = mfa.decrypt_mfa_secret(u.mfa_secret)
+    if not raw_secret or not mfa.verify_totp_code(raw_secret, body.code):
+        store.add_audit(db, None, u.email, "mfa", "Failed MFA verification attempt")
+        raise HTTPException(401, "Invalid MFA code")
+
+    store.add_audit(db, None, u.email, "auth", f"Login successful with MFA ({u.role})")
+    return _issue_authenticated_session(response, request, u, db)
+
+
+@router.post("/auth/mfa/recovery")
+def mfa_recovery(
+    request: Request,
+    response: Response,
+    body: MfaRecoveryBody,
+    db: Session = Depends(get_db)
+):
+    from services import mfa
+    try:
+        claims = auth.decode_token(body.mfa_token, expected_type="mfa_pending")
+    except ValueError as e:
+        raise HTTPException(401, f"Invalid or expired MFA session: {e}")
+
+    u = db.query(models.User).filter_by(id=claims.get("user_id")).first()
+    if not u or u.deleted_at is not None or (u.status and u.status != "active"):
+        raise HTTPException(401, "User account is suspended, deleted, or inactive")
+
+    valid, updated_json = mfa.verify_and_consume_recovery_code(u.mfa_recovery_codes, body.recovery_code)
+    if not valid:
+        store.add_audit(db, None, u.email, "mfa", "Failed MFA backup recovery code attempt")
+        raise HTTPException(401, "Invalid or already consumed recovery code")
+
+    u.mfa_recovery_codes = updated_json
+    db.commit()
+    store.add_audit(db, None, u.email, "mfa", f"MFA backup recovery code successfully consumed for {u.email}")
+    store.add_audit(db, None, u.email, "auth", f"Login successful via MFA recovery code ({u.role})")
+    return _issue_authenticated_session(response, request, u, db)
+
+
+@router.post("/auth/mfa/disable")
+def mfa_disable(
+    body: MfaDisableBody,
+    u: models.User = Depends(current_user),
+    db: Session = Depends(get_db)
+):
+    from services import mfa
+    if not u.mfa_enabled or not u.mfa_secret:
+        raise HTTPException(400, "MFA is not enabled")
+    raw_secret = mfa.decrypt_mfa_secret(u.mfa_secret)
+    if not raw_secret or not mfa.verify_totp_code(raw_secret, body.code):
+        raise HTTPException(400, "Invalid MFA code to disable MFA")
+
+    u.mfa_enabled = False
+    u.mfa_secret = None
+    u.mfa_recovery_codes = None
+    db.commit()
+    store.add_audit(db, None, u.email, "mfa", f"MFA disabled by user {u.email}")
+    return {"message": "MFA disabled successfully", "mfa_enabled": False}
+
+
+@router.post("/admin/users/{user_id}/mfa/reset")
+def admin_reset_mfa(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require("global_admin"))
+):
+    target = db.query(models.User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+
+    target.mfa_enabled = False
+    target.mfa_secret = None
+    target.mfa_recovery_codes = None
+    target.must_reset_password = True
+    revoke_user_tokens(db, target.id)
     db.commit()
 
-    # Deliver refresh token via httpOnly, Secure cookie
-    response.set_cookie(
-        key="tf_refresh_token",
-        value=tokens["refresh_token"],
-        httponly=True,
-        secure=True,
-        samesite=_cookie_samesite(request),
-        path="/api",
-        max_age=7 * 86400,
+    store.add_audit(
+        db, None, admin.email, "admin",
+        f"Admin MFA Reset: Global admin {admin.email} reset MFA for {target.email} (ID {target.id}); password reset enforced"
     )
-
-    store.add_audit(db, None, u.email, "auth", f"Login successful ({u.role})")
     return {
-        "token": tokens["access_token"],
-        "csrf_token": tokens["csrf_token"],
-        "user": _user_json(u)
+        "message": f"MFA reset successfully for {target.email}. User must reset password on next login.",
+        "userId": target.id,
+        "email": target.email,
+        "mfa_enabled": False
     }
 
 
@@ -467,8 +711,11 @@ class IssueHospitalUserBody(BaseModel):
 # ── Regional Hubs Management (Global Admin Only) ───────────────────────────
 
 @router.get("/admin/hubs")
-def list_hubs(db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
-    hubs = db.query(models.RegionalHub).order_by(models.RegionalHub.id).all()
+def list_hubs(include_deleted: bool = False, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    q = db.query(models.RegionalHub)
+    if not include_deleted:
+        q = q.filter(models.RegionalHub.deleted_at.is_(None))
+    hubs = q.order_by(models.RegionalHub.id).all()
     res = []
     for h in hubs:
         hosp_count = db.query(models.Hospital).filter_by(hub_id=h.id).count()
@@ -481,7 +728,8 @@ def list_hubs(db: Session = Depends(get_db), u: models.User = Depends(require("g
             "createdBy": h.created_by,
             "hospitalCount": hosp_count,
             "adminCount": admin_count,
-            "createdAt": str(h.created_at)
+            "createdAt": str(h.created_at),
+            "deletedAt": h.deleted_at.isoformat() if h.deleted_at else None
         })
     return res
 
@@ -547,11 +795,27 @@ def delete_hub(hub_id: str, db: Session = Depends(get_db), u: models.User = Depe
     hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
     if not hub:
         raise HTTPException(404, "Regional Hub not found")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    hub.deleted_at = now
+    hub.deleted_by = u.id
+    hub.status = "deleted"
     cascade_hub_suspension(db, hub_id, action="delete")
-    db.delete(hub)
     db.commit()
-    store.add_audit(db, None, u.email, "admin", f"Deleted regional hub '{hub_id}'")
-    return {"message": f"Regional Hub '{hub_id}' deleted successfully"}
+    store.add_audit(db, None, u.email, "admin", f"Soft-deleted regional hub '{hub_id}'")
+    return {"message": f"Regional Hub '{hub_id}' soft-deleted successfully", "deleted_at": now.isoformat()}
+
+
+@router.post("/admin/hubs/{hub_id}/restore")
+def restore_hub(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    hub = db.query(models.RegionalHub).filter_by(id=hub_id).first()
+    if not hub:
+        raise HTTPException(404, "Regional Hub not found")
+    hub.deleted_at = None
+    hub.deleted_by = None
+    hub.status = "active"
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Restored regional hub '{hub_id}' from soft delete")
+    return {"message": f"Regional Hub '{hub_id}' restored successfully", "status": "active"}
 
 
 @router.post("/admin/hubs/{hub_id}/admins")
@@ -583,16 +847,21 @@ def issue_hub_admin(hub_id: str, body: IssueAdminBody, db: Session = Depends(get
 
 
 @router.get("/admin/hubs/{hub_id}/admins")
-def list_hub_admins(hub_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
-    admins = db.query(models.User).filter_by(hub_id=hub_id, role="regional_admin").all()
+def list_hub_admins(hub_id: str, include_deleted: bool = False, db: Session = Depends(get_db), u: models.User = Depends(require("global_admin"))):
+    q = db.query(models.User).filter_by(hub_id=hub_id, role="regional_admin")
+    if not include_deleted:
+        q = q.filter(models.User.deleted_at.is_(None))
+    admins = q.all()
     return [_user_json(a) for a in admins]
 
 
 # ── Hospital Management (Regional Admin scoped to their hub, Global Admin supervisor) ──────────
 
 @router.get("/regional/hospitals")
-def list_regional_hospitals(db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+def list_regional_hospitals(include_deleted: bool = False, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
     q = db.query(models.Hospital)
+    if not include_deleted:
+        q = q.filter(models.Hospital.deleted_at.is_(None))
     if u.role == "regional_admin":
         if not u.hub_id:
             return []
@@ -610,7 +879,8 @@ def list_regional_hospitals(db: Session = Depends(get_db), u: models.User = Depe
             "shareDeidentified": bool(h.share_deidentified),
             "userCount": user_count,
             "datasetSize": node.dataset_size if node else 0,
-            "nodeStatus": node.status if node else "offline"
+            "nodeStatus": node.status if node else "offline",
+            "deletedAt": h.deleted_at.isoformat() if h.deleted_at else None
         })
     return res
 
@@ -694,20 +964,34 @@ def reactivate_hospital(hospital_id: str, db: Session = Depends(get_db), u: mode
 
 
 @router.delete("/regional/hospitals/{hospital_id}")
+@router.delete("/admin/hospitals/{hospital_id}")
 def delete_hospital(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
     hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
     if not hosp:
         raise HTTPException(404, "Hospital not found")
     if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
         raise HTTPException(403, "Regional admin cannot delete hospitals outside their assigned hub")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    hosp.deleted_at = now
+    hosp.deleted_by = u.id
+    hosp.status = "deleted"
     cascade_hospital_suspension(db, hospital_id, action="remove")
-    db.delete(hosp)
-    node = db.query(models.HospitalNode).filter_by(id=hospital_id).first()
-    if node:
-        db.delete(node)
     db.commit()
-    store.add_audit(db, None, u.email, "admin", f"Removed hospital '{hospital_id}'")
-    return {"message": f"Hospital '{hospital_id}' removed successfully"}
+    store.add_audit(db, None, u.email, "admin", f"Soft-deleted hospital '{hospital_id}'")
+    return {"message": f"Hospital '{hospital_id}' soft-deleted successfully", "deleted_at": now.isoformat()}
+
+
+@router.post("/regional/hospitals/{hospital_id}/restore")
+@router.post("/admin/hospitals/{hospital_id}/restore")
+def restore_hospital(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
+    if not hosp:
+        raise HTTPException(404, "Hospital not found")
+    if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
+        raise HTTPException(403, "Regional admin cannot restore hospitals outside their assigned hub")
+    reactivate_hospital_cascade(db, hospital_id)
+    store.add_audit(db, None, u.email, "admin", f"Restored hospital '{hospital_id}' from soft delete")
+    return {"message": f"Hospital '{hospital_id}' reactivated"}
 
 
 @router.post("/regional/hospitals/{hospital_id}/users")
@@ -743,13 +1027,16 @@ def issue_hospital_user(hospital_id: str, body: IssueHospitalUserBody, db: Sessi
 
 
 @router.get("/regional/hospitals/{hospital_id}/users")
-def list_hospital_users(hospital_id: str, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+def list_hospital_users(hospital_id: str, include_deleted: bool = False, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
     hosp = db.query(models.Hospital).filter_by(id=hospital_id).first()
     if not hosp:
         raise HTTPException(404, "Hospital not found")
     if u.role == "regional_admin" and hosp.hub_id != u.hub_id:
         raise HTTPException(403, "Access forbidden to hospital users outside your hub")
-    users = db.query(models.User).filter_by(hospital_id=hospital_id).all()
+    q = db.query(models.User).filter_by(hospital_id=hospital_id)
+    if not include_deleted:
+        q = q.filter(models.User.deleted_at.is_(None))
+    users = q.all()
     return [_user_json(usr) for usr in users]
 
 
@@ -771,7 +1058,32 @@ def suspend_user(user_id: int, db: Session = Depends(get_db), u: models.User = D
 
 
 @router.delete("/regional/users/{user_id}")
+@router.delete("/admin/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
+    target = db.query(models.User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target.id == u.id:
+        raise HTTPException(400, "Cannot delete your own account")
+    if u.role == "regional_admin":
+        if not target.hospital_id:
+            raise HTTPException(403, "Regional admin can only manage hospital users")
+        hosp = db.query(models.Hospital).filter_by(id=target.hospital_id).first()
+        if not hosp or hosp.hub_id != u.hub_id:
+            raise HTTPException(403, "Regional admin cannot delete users outside their hub")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    target.deleted_at = now
+    target.deleted_by = u.id
+    target.status = "deleted"
+    revoke_user_tokens(db, target.id)
+    db.commit()
+    store.add_audit(db, None, u.email, "admin", f"Soft-deleted user {target.email} ({target.role}) and revoked tokens")
+    return {"message": f"User '{target.email}' soft-deleted successfully", "deleted_at": now.isoformat()}
+
+
+@router.post("/regional/users/{user_id}/restore")
+@router.post("/admin/users/{user_id}/restore")
+def restore_user(user_id: int, db: Session = Depends(get_db), u: models.User = Depends(require("regional_admin", "global_admin"))):
     target = db.query(models.User).filter_by(id=user_id).first()
     if not target:
         raise HTTPException(404, "User not found")
@@ -780,14 +1092,77 @@ def delete_user(user_id: int, db: Session = Depends(get_db), u: models.User = De
             raise HTTPException(403, "Regional admin can only manage hospital users")
         hosp = db.query(models.Hospital).filter_by(id=target.hospital_id).first()
         if not hosp or hosp.hub_id != u.hub_id:
-            raise HTTPException(403, "Regional admin cannot delete users outside their hub")
-    revoke_user_tokens(db, target.id)
-    email = target.email
-    role = target.role
-    db.delete(target)
+            raise HTTPException(403, "Regional admin cannot restore users outside their hub")
+    target.deleted_at = None
+    target.deleted_by = None
+    target.status = "active"
     db.commit()
-    store.add_audit(db, None, u.email, "admin", f"Deleted user {email} ({role}) and revoked tokens")
-    return {"message": f"User '{email}' deleted successfully"}
+    store.add_audit(db, None, u.email, "admin", f"Restored user {target.email} from soft delete")
+    return {"message": f"User '{target.email}' restored successfully", "status": "active"}
+
+
+class PurgeDeletedBody(BaseModel):
+    retention_days: Optional[int] = None
+
+
+@router.post("/admin/purge-deleted")
+def purge_deleted_records(
+    body: Optional[PurgeDeletedBody] = None,
+    db: Session = Depends(get_db),
+    u: models.User = Depends(require("global_admin"))
+):
+    default_days = int(os.getenv("SOFT_DELETE_RETENTION_DAYS", "30"))
+    retention_days = body.retention_days if (body and body.retention_days is not None) else default_days
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=retention_days)
+
+    # 1. Purge expired users
+    expired_users = db.query(models.User).filter(
+        models.User.deleted_at.isnot(None),
+        models.User.deleted_at < cutoff
+    ).all()
+    purged_users = 0
+    for usr in expired_users:
+        revoke_user_tokens(db, usr.id)
+        db.delete(usr)
+        purged_users += 1
+
+    # 2. Purge expired hospitals
+    expired_hospitals = db.query(models.Hospital).filter(
+        models.Hospital.deleted_at.isnot(None),
+        models.Hospital.deleted_at < cutoff
+    ).all()
+    purged_hospitals = 0
+    for h in expired_hospitals:
+        node = db.query(models.HospitalNode).filter_by(id=h.id).first()
+        if node:
+            db.delete(node)
+        db.delete(h)
+        purged_hospitals += 1
+
+    # 3. Purge expired hubs
+    expired_hubs = db.query(models.RegionalHub).filter(
+        models.RegionalHub.deleted_at.isnot(None),
+        models.RegionalHub.deleted_at < cutoff
+    ).all()
+    purged_hubs = 0
+    for hub in expired_hubs:
+        db.delete(hub)
+        purged_hubs += 1
+
+    db.commit()
+    store.add_audit(
+        db, None, u.email, "admin",
+        f"Purged records soft-deleted over {retention_days} days ago: {purged_users} users, {purged_hospitals} hospitals, {purged_hubs} hubs"
+    )
+    return {
+        "retention_days": retention_days,
+        "cutoff": cutoff.isoformat(),
+        "purged": {
+            "users": purged_users,
+            "hospitals": purged_hospitals,
+            "hubs": purged_hubs
+        }
+    }
 
 
 # ── Training ────────────────────────────────────────────────────────────────

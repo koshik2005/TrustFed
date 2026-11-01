@@ -1,0 +1,7 @@
+# TrustFed-Health Security Contact Information (RFC 9116)
+Contact: mailto:security@trustfed.ai
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://trustfed-backend.onrender.com/.well-known/security.txt
+Policy: https://trustfed-backend.onrender.com/security
+Acknowledgments: https://trustfed-backend.onrender.com/hall-of-fame

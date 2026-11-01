@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, Depends
+from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -38,6 +39,8 @@ async def lifespan(app: FastAPI):
     migrate_up(engine)
     from db.migrations.v3_performance_indexes import migrate_up as migrate_v3_indexes
     migrate_v3_indexes(engine)
+    from db.migrations.v4_mfa_and_soft_delete import migrate_up as migrate_v4_mfa
+    migrate_v4_mfa(engine)
     from db.migrations.enable_rls import enable_row_level_security
     enable_row_level_security(engine)
 
@@ -46,6 +49,8 @@ async def lifespan(app: FastAPI):
         from services import seed_data
         seed_data.seed_synthetic_data(db)
         store.seed_users(db)
+        from services.credential_guard import validate_no_default_credentials_on_startup
+        validate_no_default_credentials_on_startup(db)
         store.migrate_legacy_predictions(db)
         from db import models
         for s in db.query(models.FLSession).filter_by(status="running").all():
@@ -224,3 +229,22 @@ def metrics():
         "prediction_latency": predict_latency_tracker.get_metrics(),
         "mode": get_app_mode()
     }
+
+
+SECURITY_TXT_BODY = """# TrustFed-Health Security Contact Information (RFC 9116)
+Contact: mailto:security@trustfed.ai
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://trustfed-backend.onrender.com/.well-known/security.txt
+Policy: https://trustfed-backend.onrender.com/security
+Acknowledgments: https://trustfed-backend.onrender.com/hall-of-fame
+"""
+
+
+@app.get("/.well-known/security.txt", response_class=PlainTextResponse)
+@app.head("/.well-known/security.txt")
+@app.get("/security.txt", response_class=PlainTextResponse)
+@app.head("/security.txt")
+def security_txt():
+    """Serves RFC 9116 security vulnerability reporting contact info."""
+    return PlainTextResponse(SECURITY_TXT_BODY.strip() + "\n", media_type="text/plain")

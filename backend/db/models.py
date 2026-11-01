@@ -10,9 +10,11 @@ class RegionalHub(Base):
     id = Column(String, primary_key=True, index=True)        # e.g. "hub-east", "hub-west"
     name = Column(String, nullable=False)                    # e.g. "East Coast Regional Aggregator"
     region = Column(String, nullable=False, index=True)      # e.g. "East", "West"
-    status = Column(String, default="active")                # active | suspended
+    status = Column(String, default="active")                # active | suspended | deleted
     created_by = Column(Integer, nullable=True)              # User.id of creator
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by = Column(Integer, nullable=True)
 
 
 class Hospital(Base):
@@ -20,11 +22,13 @@ class Hospital(Base):
     id = Column(String, primary_key=True, index=True)        # e.g. "1", "2", "hospital-boston"
     name = Column(String, nullable=False)                    # e.g. "Boston General Hospital"
     hub_id = Column(String, index=True, nullable=True)       # references regional_hubs.id
-    status = Column(String, default="active", index=True)    # active | idle | training | suspended
+    status = Column(String, default="active", index=True)    # active | idle | training | suspended | deleted
     share_deidentified = Column(Boolean, default=False)      # Hospital-level consent flag
     consent_record_fields = Column(Text, nullable=True)      # JSON metadata: policy version, opt-in date
     dataset_size = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by = Column(Integer, nullable=True)
 
 
 # ── Identity & Access Management ───────────────────────────────────────────────
@@ -38,9 +42,14 @@ class User(Base):
     hub_id = Column(String, index=True, nullable=True)       # Set if regional_admin
     hospital_id = Column(String, index=True, nullable=True)  # Set if hospital_staff or doctor
     must_reset_password = Column(Boolean, default=False)
-    status = Column(String, default="active")                # active | suspended
+    status = Column(String, default="active")                # active | suspended | deleted
     password_hash = Column(String, nullable=False)           # pbkdf2_sha256$iters$salt$hash
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by = Column(Integer, nullable=True)
+    mfa_enabled = Column(Boolean, default=False)
+    mfa_secret = Column(Text, nullable=True)                 # Encrypted TOTP secret
+    mfa_recovery_codes = Column(Text, nullable=True)         # JSON list of SHA-256 hashed recovery codes
 
 
 # ── Clinical Patients & Encounters (De-identified & Encrypted) ─────────────────

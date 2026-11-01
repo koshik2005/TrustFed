@@ -16,32 +16,16 @@ _audit_lock = threading.Lock()
 
 
 def seed_users(db: Session):
-    env = os.getenv("ENVIRONMENT", "development").strip().lower()
-    allow_demo = os.getenv("ALLOW_DEMO_USERS", "true").strip().lower() in ("true", "1", "yes")
-    is_prod = env in ("production", "prod")
-
-    if is_prod and not allow_demo:
-        # Strict production: NEVER seed demo users. Disable any legacy demo accounts using default password.
-        import secrets
-        for email, _, _, _ in DEMO_USERS:
-            existing = db.query(models.User).filter_by(email=email).first()
-            if existing and auth.verify_password("password123", existing.password_hash):
-                existing.password_hash = f"DISABLED${secrets.token_hex(32)}"
-                db.commit()
-                print(f"[SECURITY] Disabled un-rotated demo account in production: {email}")
-        print("[INFO] Production mode active: demo user seeding skipped.")
-        return
-
-    pw = os.getenv("DEMO_PASSWORD", "password123")
-    for email, name, role, hid in DEMO_USERS:
+    """Sanitizes and disables any legacy demo accounts using default passwords."""
+    import secrets
+    for email, _, _, _ in DEMO_USERS:
         existing = db.query(models.User).filter_by(email=email).first()
-        if not existing:
-            db.add(models.User(email=email, name=name, role=role, hospital_id=hid,
-                               password_hash=auth.hash_password(pw)))
-        elif existing.password_hash.startswith("DISABLED$") or not auth.verify_password(pw, existing.password_hash):
-            existing.password_hash = auth.hash_password(pw)
+        if existing and auth.verify_password("password123", existing.password_hash):
+            existing.password_hash = f"DISABLED${secrets.token_hex(32)}"
+            existing.status = "suspended"
+            db.commit()
+            print(f"[SECURITY] Disabled legacy demo account with default password: {email}")
     db.commit()
-    print("[INFO] Demo test accounts verified and seeded successfully.")
 
 
 def add_audit(db: Session, session_id, node_id, event_type, description) -> models.AuditLog:
