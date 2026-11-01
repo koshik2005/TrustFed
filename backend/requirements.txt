@@ -12,6 +12,6 @@ openai>=1.30             # only for the optional NVIDIA NIM narrative
 pyjwt>=2.8.0
 slowapi>=0.1.9
 cryptography>=42.0.0
-sentry-sdk>=2.0.0
+sentry-sdk>=2.73.0
 pyotp>=2.9.0
 bcrypt>=4.0.0
