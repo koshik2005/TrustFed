@@ -37,3 +37,4 @@ test.describe('Phase A: Deployment Mode & Persistent Disclaimer', () => {
     await expect(page.locator('footer').getByText(/Mode:\s*(Informational|Clinical)/i)).toBeVisible();
   });
 });
+

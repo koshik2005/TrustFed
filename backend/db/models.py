@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -9,7 +9,7 @@ class RegionalHub(Base):
     __tablename__ = "regional_hubs"
     id = Column(String, primary_key=True, index=True)        # e.g. "hub-east", "hub-west"
     name = Column(String, nullable=False)                    # e.g. "East Coast Regional Aggregator"
-    region = Column(String, nullable=False)                  # e.g. "East", "West"
+    region = Column(String, nullable=False, index=True)      # e.g. "East", "West"
     status = Column(String, default="active")                # active | suspended
     created_by = Column(Integer, nullable=True)              # User.id of creator
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -20,7 +20,7 @@ class Hospital(Base):
     id = Column(String, primary_key=True, index=True)        # e.g. "1", "2", "hospital-boston"
     name = Column(String, nullable=False)                    # e.g. "Boston General Hospital"
     hub_id = Column(String, index=True, nullable=True)       # references regional_hubs.id
-    status = Column(String, default="active")                # active | idle | training | suspended
+    status = Column(String, default="active", index=True)    # active | idle | training | suspended
     share_deidentified = Column(Boolean, default=False)      # Hospital-level consent flag
     consent_record_fields = Column(Text, nullable=True)      # JSON metadata: policy version, opt-in date
     dataset_size = Column(Integer, default=0)
@@ -34,7 +34,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
-    role = Column(String, nullable=False)                    # global_admin | regional_admin | hospital_staff | doctor
+    role = Column(String, nullable=False, index=True)        # global_admin | regional_admin | hospital_staff | doctor
     hub_id = Column(String, index=True, nullable=True)       # Set if regional_admin
     hospital_id = Column(String, index=True, nullable=True)  # Set if hospital_staff or doctor
     must_reset_password = Column(Boolean, default=False)
@@ -48,21 +48,31 @@ class User(Base):
 class Patient(Base):
     """Hospital-scoped patient entity. Name and Contact are ENCRYPTED AT REST and never leave hospital scope."""
     __tablename__ = "patients"
+    __table_args__ = (
+        Index("ix_patients_hospital_identifier", "hospital_id", "patient_identifier"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     patient_identifier = Column(String, unique=True, index=True, nullable=False)  # Pseudonymous MRN e.g. PT-9A8B7C
     hospital_id = Column(String, index=True, nullable=False)
-    name_encrypted = Column(Text, nullable=False)            # Encrypted via Fernet AES-128-CBC + HMAC-SHA256
-    contact_encrypted = Column(Text, nullable=False)         # Encrypted via Fernet AES-128-CBC + HMAC-SHA256
+    name_encrypted = Column(Text, nullable=False)            # Encrypted via MultiFernet AES-128-CBC + HMAC-SHA256
+    contact_encrypted = Column(Text, nullable=False)         # Encrypted via MultiFernet AES-128-CBC + HMAC-SHA256
     age = Column(Integer, nullable=False)                    # De-identified clinical attribute
     sex = Column(Integer, nullable=False)                    # 0=Female, 1=Male, 2=Other
     weight = Column(Float, nullable=True)                    # kg
     height = Column(Float, nullable=True)                    # cm
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class Encounter(Base):
     """Clinical encounter representing an assessment for general multi-disease diagnosis."""
     __tablename__ = "encounters"
+    __table_args__ = (
+        Index("ix_encounters_hospital_created", "hospital_id", "created_at"),
+        Index("ix_encounters_patient_created", "patient_id", "created_at"),
+        Index("ix_encounters_hospital_confirmed", "hospital_id", "confirmed_at"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     encounter_identifier = Column(String, unique=True, index=True, nullable=False)
     patient_id = Column(Integer, index=True, nullable=False) # references patients.id
@@ -74,13 +84,13 @@ class Encounter(Base):
     optional_labs = Column(Text, nullable=True)              # JSON: {"wbc": 11.2, "platelets": 140, "crp": 24, "urine_leukocytes": "positive"}
     model_version = Column(String, nullable=True)            # Model version evaluated
     predicted_top3 = Column(Text, nullable=True)             # JSON: [{"disease": "Dengue", "probability": 0.72}, {"disease": "Viral Fever", "probability": 0.18}, ...]
-    doctor_confirmed_diagnosis = Column(String, nullable=True) # Extensible disease code e.g. "DENGUE"
+    doctor_confirmed_diagnosis = Column(String, nullable=True, index=True) # Extensible disease code e.g. "DENGUE"
     cause = Column(Text, nullable=True)                      # Clinical etiology narrative
     treatment = Column(Text, nullable=True)                  # Prescribed treatment / medication
     confirmed_by = Column(Integer, nullable=True)            # Doctor User.id
-    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True, index=True)
     trainable = Column(Boolean, default=False)               # Trainable only if confirmed & hospital consents
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 # ── Extensible Disease Registry & Model Governance ─────────────────────────────
@@ -121,7 +131,7 @@ class ConsentRecord(Base):
     patient_id = Column(Integer, index=True, nullable=True)
     consent_type = Column(String, nullable=False)            # FEDERATED_TRAINING_DEIDENTIFIED | CLINICAL_RESEARCH
     status = Column(String, default="granted")               # granted | revoked
-    granted_at = Column(DateTime(timezone=True), server_default=func.now())
+    granted_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     hash = Column(String, nullable=True)
 
@@ -129,15 +139,19 @@ class ConsentRecord(Base):
 class AuditLog(Base):
     """Hash-chained audit trail: hash_n = SHA256(hash_{n-1} | timestamp | node | type | description)."""
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_node_timestamp", "node_id", "timestamp"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String, index=True, nullable=True)
-    node_id = Column(String, nullable=True)
-    event_type = Column(String)                              # training | prediction | encounter | auth | config | consent
+    node_id = Column(String, nullable=True, index=True)
+    event_type = Column(String, index=True)                  # training | prediction | encounter | auth | config | consent
     description = Column(String)
     timestamp_iso = Column(String)                           # exact string that was hashed
     prev_hash = Column(String)
     hash = Column(String)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 # ── Backward-Compatibility Tables (Heart-Disease Model & Sessions Preserved) ──
@@ -155,7 +169,7 @@ class PatientPrediction(Base):
     confidence = Column(Float)
     explanation_text = Column(String, nullable=True)
     shap_values = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class FLSession(Base):
@@ -223,10 +237,14 @@ class PrivacyReport(Base):
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
+    __table_args__ = (
+        Index("ix_refresh_tokens_user_expires", "user_id", "expires_at"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, index=True, nullable=False)
     jti = Column(String, unique=True, index=True, nullable=False)
     csrf_token = Column(String, nullable=False)
     revoked = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)

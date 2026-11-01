@@ -3,7 +3,7 @@ import json
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, Cookie
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from services import auth, crypto, inference, store, disease_inference, clinical
 from services.explanation import generate_clinical_explanation
 from core import deployment_mode
 from core.deployment_mode import PERSISTENT_DISCLAIMER
+from core.metrics import predict_latency_tracker
 from tefl import nn
 
 router = APIRouter()
@@ -901,6 +902,24 @@ DEFAULT_MODEL_PATH = os.path.join(
 )
 
 
+_CACHED_ACTIVE_MODEL: Optional[Tuple[models.FLSession, Any, bool]] = None
+
+
+def get_cached_active_model(db: Session, force_reload: bool = False) -> Tuple[models.FLSession, Any, bool]:
+    """Return in-memory cached active model to prevent repetitive disk I/O on inference."""
+    global _CACHED_ACTIVE_MODEL
+    if _CACHED_ACTIVE_MODEL is not None and not force_reload:
+        return _CACHED_ACTIVE_MODEL
+    _CACHED_ACTIVE_MODEL = _active_model(db)
+    return _CACHED_ACTIVE_MODEL
+
+
+def invalidate_active_model_cache() -> None:
+    """Invalidate model cache on new training round or model update."""
+    global _CACHED_ACTIVE_MODEL
+    _CACHED_ACTIVE_MODEL = None
+
+
 def _active_model(db: Session):
     sessions = (db.query(models.FLSession).filter(models.FLSession.status == "Completed")
                 .order_by(models.FLSession.id.desc()).all())
@@ -957,36 +976,54 @@ def _pred_json(p: models.PatientPrediction):
 
 
 @router.post("/prediction/predict")
+@router.post("/predict")
 def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.User = Depends(active_user)):
-    s, model, is_fallback = _active_model(db)
+    t0 = time.perf_counter()
     try:
-        r = inference.predict(model, vitals)
-    except ValueError as e:
-        raise HTTPException(422, str(e))
-    text = generate_clinical_explanation(vitals, r["riskScore"], r["shapValues"])
-    pid = uuid.uuid4().hex[:8].upper()
+        s, model, is_fallback = get_cached_active_model(db)
+        try:
+            r = inference.predict(model, vitals)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        text = generate_clinical_explanation(vitals, r["riskScore"], r["shapValues"])
+        pid = uuid.uuid4().hex[:8].upper()
 
-    row = models.PatientPrediction(
-        patient_identifier=pid,
-        session_id=s.session_id,
-        hospital_id=u.hospital_id,
-        user_id=u.id,
-        age=int(float(vitals["age"])),
-        risk_score=r["riskScore"],
-        confidence=r["confidence"],
-        explanation_text=text,
-        shap_values=json.dumps(r["shapValues"])
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
+        row = models.PatientPrediction(
+            patient_identifier=pid,
+            session_id=s.session_id,
+            hospital_id=u.hospital_id,
+            user_id=u.id,
+            age=int(float(vitals["age"])),
+            risk_score=r["riskScore"],
+            confidence=r["confidence"],
+            explanation_text=text,
+            shap_values=json.dumps(r["shapValues"])
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
 
-    if is_fallback:
+        if is_fallback:
+            store.add_audit(db, s.session_id, u.email, "prediction",
+                            f"Inference model fallback to pretrained_cleveland.npz baseline for patient {pid}")
         store.add_audit(db, s.session_id, u.email, "prediction",
-                        f"Inference model fallback to pretrained_cleveland.npz baseline for patient {pid}")
-    store.add_audit(db, s.session_id, u.email, "prediction",
-                    f"Risk prediction {pid}: {r['riskLabel']} ({r['riskScore']:.2f}) [Model: {s.session_id}]")
-    return _pred_json(row)
+                        f"Risk prediction {pid}: {r['riskLabel']} ({r['riskScore']:.2f}) [Model: {s.session_id}]")
+        predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=False)
+        return _pred_json(row)
+    except Exception:
+        predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=True)
+        raise
+
+
+@router.get("/prediction/metrics")
+@router.get("/system/metrics")
+def prediction_metrics():
+    """Returns latency percentiles (p50, p95, p99) and summary stats for /predict."""
+    return {
+        "status": "ok",
+        "prediction_latency": predict_latency_tracker.get_metrics(),
+        "mode": deployment_mode.get_app_mode(),
+    }
 
 
 @router.get("/prediction/history")
@@ -1253,6 +1290,7 @@ def predict_clinical_differential(
     """Predicts differential diagnosis with calibrated top 3, red-flags, explanations, and adaptive questioning."""
     hospital_id = _resolve_hospital_scope(u, body.hospital_id) if (u.role != "global_admin" or body.hospital_id) else (u.hospital_id or "1")
 
+    t0 = time.perf_counter()
     # Validate inputs
     enc_errors = {}
     valid_enc, enc_errors = clinical_validation.validate_encounter_payload({
@@ -1263,6 +1301,7 @@ def predict_clinical_differential(
         "optional_labs": body.optional_labs
     })
     if not valid_enc:
+        predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=True)
         raise HTTPException(status_code=422, detail={"errors": enc_errors, "message": "Clinical validation failed."})
 
     sex_int = 0
@@ -1280,16 +1319,21 @@ def predict_clinical_differential(
             for c in db.query(models.Encounter).filter_by(hospital_id=hospital_id, trainable=True).all()
         ]
 
-    diff_res = general_disease_model.predict_differential(
-        age=body.age,
-        sex=sex_int,
-        symptoms=body.symptoms or [],
-        symptom_duration_days=int(body.symptom_duration_days or 1),
-        vitals=body.vitals or {},
-        optional_labs=body.optional_labs or {},
-        structured_ecg=body.structured_ecg_finding,
-        hospital_confirmed_records=hospital_records
-    )
+    try:
+        diff_res = general_disease_model.predict_differential(
+            age=body.age,
+            sex=sex_int,
+            symptoms=body.symptoms or [],
+            symptom_duration_days=int(body.symptom_duration_days or 1),
+            vitals=body.vitals or {},
+            optional_labs=body.optional_labs or {},
+            structured_ecg=body.structured_ecg_finding,
+            hospital_confirmed_records=hospital_records
+        )
+        predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=False)
+    except Exception:
+        predict_latency_tracker.record((time.perf_counter() - t0) * 1000.0, is_error=True)
+        raise
 
     if diff_res.get("isFallback") and hospital_id:
         store.add_audit(

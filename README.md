@@ -251,6 +251,22 @@ TrustFed uses environment variables to configure operational mode, cryptography,
 
 ---
 
+## 7b. Production Infrastructure, High-Availability & Secrets Rotation
+
+- **Always-On Backend Hosting**: Zero cold starts via Render `starter` plan in Singapore (`singapore`), continuous health check via `/ready`.
+- **Managed PostgreSQL in India**: Recommended setup on Supabase / AWS RDS Mumbai (`ap-south-1`) with connection pooling (`DB_POOL_SIZE=10`, `DB_MAX_OVERFLOW=20`, `pool_pre_ping=True`).
+- **Readiness vs. Liveness Probes**:
+  - `/ready`: Verifies database connectivity and in-memory model availability; returns HTTP 503 if unready.
+  - `/health`: Lightweight liveness probe strictly sanitized to prevent credential or traceback leakage.
+- **Automated Backup & Tested Restore**: Tested via [`scripts/restore_drill.sh`](scripts/restore_drill.sh) proving 100% data recovery across all 16 tables.
+- **Zero-Downtime Secrets Rotation**:
+  - **MultiFernet PHI Encryption**: Multi-key keyring keeping historical records decryptable while new intake encrypts with primary key.
+  - **JWT Key Rotation**: Key ID (`kid`) based header signing and multi-secret verification.
+  - Tested via [`scripts/rotation_drill.py`](scripts/rotation_drill.py).
+- **Latency & High Concurrency Performance**: ML models preloaded in memory at startup; p95 latency under 500 ms under 50 concurrent users. Documented in [`docs/LOAD_TEST.md`](docs/LOAD_TEST.md).
+
+---
+
 ## 8. Data Privacy Technical Architecture (Design Considerations, Not a Compliance Claim)
 
 > [!WARNING]
@@ -281,6 +297,9 @@ TrustFed uses environment variables to configure operational mode, cryptography,
 
 ## 10. Documentation Index
 
+- [Hosting & Infrastructure Architecture](docs/HOSTING.md) — Always-on hosting, managed PostgreSQL in Indian regions, and dashboard checklists.
+- [Automated Backups & Restore Drill](docs/BACKUPS.md) — Continuous WAL PITR, automated snapshots, and tested recovery drills.
+- [High-Concurrency Load Test Report](docs/LOAD_TEST.md) — 50 concurrent users for 5 minutes, throughput, error rates, and p95 latency.
 - [REST API Specification](docs/API.md) — Exhaustive documentation of all endpoints, parameters, and error responses.
 - [Production Readiness Audit](docs/PRODUCTION_READINESS.md) — 10-point audit checklist covering security, auth, tenancy, and clinical safety.
 - [Model Card (TF-GenDisease-v1.0)](docs/MODEL_CARD.md) — Architecture, ECE calibration, per-disease precision/recall, and limitations.

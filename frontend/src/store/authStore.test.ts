@@ -1,6 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from './authStore';
 import type { User } from '../types';
+
+vi.mock('axios', () => ({
+  default: {
+    post: vi.fn().mockResolvedValue({ data: { message: 'Logged out successfully' } }),
+    get: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}));
 
 class LocalStorageMock {
   private store: Record<string, string> = {};

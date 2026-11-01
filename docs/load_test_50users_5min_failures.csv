@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/clinical/predict,HTTPError('500 Server Error: Internal Server Error for url: /clinical/predict'),16,2026-11-01T05:40:33Z,2026-11-01T05:42:35Z
+GET,/ready,HTTPError('503 Server Error: Service Unavailable for url: /ready'),5,2026-11-01T05:40:33Z,2026-11-01T05:42:35Z
+POST,/prediction/predict,HTTPError('500 Server Error: Internal Server Error for url: /prediction/predict'),13,2026-11-01T05:40:33Z,2026-11-01T05:42:35Z

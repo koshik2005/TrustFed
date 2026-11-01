@@ -1,30 +1,59 @@
 services:
-  # FastAPI Backend Service
+  # FastAPI Backend Service (Production-Grade, Always-On, Zero Cold Starts)
   - type: web
     name: trustfed-backend
     runtime: python
-    region: oregon
-    plan: free
+    region: singapore          # Closest Render region to India with lowest latency (<60ms)
+    plan: starter              # Always-on starter plan ($7/mo): NO cold starts, persistent memory
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
+    healthCheckPath: /ready    # Verifies both DB connection and in-memory ML model readiness
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ENVIRONMENT
         value: production
-      - key: JWT_SECRET
-        generateValue: true
+      - key: APP_MODE
+        value: informational
       - key: CORS_ORIGINS
         value: https://frontend-3qgo.vercel.app,http://localhost:5173
       - key: ALLOW_DEMO_USERS
         value: "true"
       - key: DEMO_PASSWORD
         value: password123
-      - key: SUPABASE_DB_URL
+
+      # Secrets Manager Integration (Set securely in Render Environment Secrets)
+      - key: JWT_ACTIVE_KID
+        value: v1
+      - key: JWT_SECRET
         sync: false
+      - key: JWT_KEY_RING
+        sync: false            # Format: 'v2:secret2,v1:secret1' or JSON map
+      - key: PATIENT_ENCRYPTION_KEY
+        sync: false            # MultiFernet key list: 'key2,key1'
+      - key: SUPABASE_DB_URL
+        sync: false            # Managed PostgreSQL connection string (IPv4 pooler)
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL
         value: meta/llama-3.1-70b-instruct
 
+      # Connection Pooling Configuration
+      - key: DB_POOL_SIZE
+        value: "10"
+      - key: DB_MAX_OVERFLOW
+        value: "20"
+      - key: DB_POOL_TIMEOUT
+        value: "30"
+      - key: DB_POOL_RECYCLE
+        value: "1800"
+
+# Optional Blueprint Managed Postgres in Singapore
+databases:
+  - name: trustfed-managed-postgres
+    databaseName: trustfed
+    user: trustfed_admin
+    region: singapore
+    plan: starter
+    ipAllowList: []            # Enforce private VPC access only
