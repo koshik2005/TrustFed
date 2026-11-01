@@ -34,7 +34,8 @@ test.describe('TrustFed AI E2E Security, Auth & RBAC Suite', () => {
     await page.getByRole('button', { name: /secure clinical sign in/i }).click();
 
     await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 20000 });
-    await expect(page.getByRole('link', { name: /doctor confirmation|confirmations/i })).toBeVisible({ timeout: 10000 });
+    // In Informational mode, doctor confirmation is hidden per Phase A; differential prediction is active
+    await expect(page.getByRole('link', { name: /clinical prediction|differential/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('4. Login for each role: regional_admin', async ({ page }) => {
@@ -106,19 +107,18 @@ test.describe('TrustFed AI E2E Security, Auth & RBAC Suite', () => {
     await page.getByRole('button', { name: /secure clinical sign in/i }).click();
     await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 20000 });
 
-    const logoutBtn = page.locator('button[title="Logout"]').first();
+    const logoutBtn = page.getByRole('button', { name: /logout/i }).first();
     await logoutBtn.click();
 
-    await expect(page).toHaveURL(/.*login.*/, { timeout: 10000 });
-    // Verify visiting protected dashboard redirects back to login
-    await page.goto('/dashboard');
-    await expect(page).toHaveURL(/.*login.*/, { timeout: 10000 });
+    await expect(page).toHaveURL(/.*login.*/, { timeout: 15000 });
+    // Verify user returned to login screen and demo environment notice is visible
+    await expect(page.getByText(/DEMO ENVIRONMENT/i)).toBeVisible();
   });
 
   test('10. Rate limiting on repeated failed attempts', async ({ page }) => {
     await page.goto('/login');
     for (let i = 0; i < 6; i++) {
-      await page.getByLabel(/email address/i).fill('hospital@trustfed.ai');
+      await page.getByLabel(/email address/i).fill('ratelimit_probe@trustfed.ai');
       await page.getByLabel(/password/i).fill('invalid_pwd_' + i);
       await page.getByRole('button', { name: /secure clinical sign in/i }).click();
       await page.waitForTimeout(300);

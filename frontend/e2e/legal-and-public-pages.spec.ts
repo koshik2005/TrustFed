@@ -51,3 +51,4 @@ test.describe('Phase F: Public Legal & Transparency Pages', () => {
     await expect(footer.getByRole('link', { name: /Intended Use/i })).toBeVisible();
   });
 });
+

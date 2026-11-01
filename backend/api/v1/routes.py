@@ -645,6 +645,7 @@ def reset_password(
 @router.post("/auth/logout")
 def logout(
     response: Response,
+    request: Request,
     tf_refresh_token: Optional[str] = Cookie(None),
     db: Session = Depends(get_db),
     u: Optional[models.User] = Depends(current_user)
@@ -661,7 +662,9 @@ def logout(
         except Exception:
             pass
 
-    response.delete_cookie(key="tf_refresh_token", path="/api", samesite="none", secure=True)
+    s_site = _cookie_samesite(request)
+    for p in ["/api/auth", "/api", "/"]:
+        response.delete_cookie(key="tf_refresh_token", path=p, samesite=s_site, secure=True)
     if u:
         store.add_audit(db, None, u.email, "auth", f"Logout ({u.role})")
     return {"message": "Logged out successfully"}

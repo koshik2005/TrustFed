@@ -50,8 +50,8 @@ export default function DashboardLayout() {
     return user?.role ? item.roles.includes(user.role) : false;
   });
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

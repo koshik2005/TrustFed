@@ -48,13 +48,16 @@ test.describe('First-Party Refresh Cookie & Session Restoration', () => {
   test('Direct in-browser /api/auth/refresh rotation call succeeds', async ({ page }) => {
     let capturedCsrfToken: string | null = null;
 
-    await page.route('**/auth/login', async (route) => {
-      const response = await route.fetch();
-      const body = await response.json();
-      if (body?.csrf_token) {
-        capturedCsrfToken = body.csrf_token;
+    // Passive response listener avoids ECONNRESET on WebKit in Windows
+    page.on('response', async (response) => {
+      if (response.url().includes('/auth/login') && response.status() === 200) {
+        try {
+          const body = await response.json();
+          if (body?.csrf_token) {
+            capturedCsrfToken = body.csrf_token;
+          }
+        } catch { /* ignore */ }
       }
-      await route.fulfill({ response, json: body });
     });
 
     await page.goto('/login');
@@ -65,7 +68,9 @@ test.describe('First-Party Refresh Cookie & Session Restoration', () => {
     await page.getByRole('button', { name: /secure clinical sign in/i }).click();
 
     await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 30000 });
-    expect(capturedCsrfToken).not.toBeNull();
+    
+    // Wait briefly for the login response to be processed by listener
+    await expect.poll(() => capturedCsrfToken, { timeout: 10000 }).not.toBeNull();
 
     // Direct in-browser fetch against the proxy rewrite endpoint
     const refreshResult = await page.evaluate(async (csrf: string) => {
