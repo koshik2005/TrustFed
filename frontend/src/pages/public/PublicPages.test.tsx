@@ -34,7 +34,7 @@ describe('Phase F Public Legal & Transparency Pages', () => {
     expect(screen.getByRole('heading', { name: /Privacy Policy/i })).toBeInTheDocument();
     expect(screen.getByText(/What Is NOT Collected/i)).toBeInTheDocument();
     expect(screen.getAllByText(/NOT ACTIVE/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Essential Cookies Only Notice/i)).toBeInTheDocument();
+    expect(screen.getByText(/Essential Cookies Notice & Technical Attributes/i)).toBeInTheDocument();
   });
 
   it('renders MedicalDisclaimerPage with emergency numbers and pending physician review labels', () => {
@@ -63,7 +63,7 @@ describe('Phase F Public Legal & Transparency Pages', () => {
 
     expect(screen.getByText(/DRAFT, pending legal review/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Contact & Grievance Redressal/i })).toBeInTheDocument();
-    expect(screen.getByText(/Adv\. Rajesh V\. Sharma/i)).toBeInTheDocument();
+    expect(screen.getByText(/Grievance Officer Name - Pending Formal Statutory Appointment/i)).toBeInTheDocument();
     expect(screen.getAllByText(/grievance-officer@trustfed.ai/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Bengaluru, Karnataka/i)).toBeInTheDocument();
     expect(screen.getByText(/15 days/i)).toBeInTheDocument();

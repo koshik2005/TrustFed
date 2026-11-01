@@ -76,30 +76,66 @@ export default function PrivacyPolicyPage() {
         </div>
       </section>
 
-      {/* ── SECTION 2: ESSENTIAL COOKIES ONLY ── */}
+      {/* ── SECTION 2: STAFF & ADMINISTRATIVE ACCOUNT DATA ── */}
+      <section className="mb-8 p-5 rounded-2xl bg-white border border-slate-200">
+        <h2 className="text-base font-bold text-slate-900 mb-2">
+          2. Platform Accounts & Staff Data Processing
+        </h2>
+        <p className="text-xs text-slate-600 mb-3">
+          While anonymous public decision support collects zero patient data, authorized healthcare personnel and system administrators have provisioned operational accounts. The following operational account data is processed:
+        </p>
+        <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-700">
+          <li><strong>Staff Identity & Roles:</strong> Work email addresses and assigned role tiers (<code>global_admin</code>, <code>regional_admin</code>, <code>doctor</code>, <code>hospital_staff</code>) for role-based access control.</li>
+          <li><strong>Authentication Credentials:</strong> Passwords hashed with <code>bcrypt</code> (work factor 12). Plaintext passwords are never stored or logged.</li>
+          <li><strong>MFA Credentials:</strong> TOTP Base32 secrets stored encrypted; single-use emergency recovery codes hashed using SHA-256.</li>
+          <li><strong>Immutable Audit Trail:</strong> High-risk administrative actions (user provisioning, soft deletions, password changes, model checkpoint promotions) record the acting user ID and timestamp in an append-only audit ledger.</li>
+          <li><strong>Ephemeral Network Identifiers:</strong> IP addresses are inspected in-memory by rate limiters (SlowAPI) to prevent denial of service and brute-force attacks, and are never attached to public decision-support queries.</li>
+          <li><strong>Retention Policy:</strong> Account records remain active while the personnel is affiliated with their hospital node. Soft-deleted accounts enter a 30-day retention grace period before permanent purging.</li>
+        </ul>
+      </section>
+
+      {/* ── SECTION 3: ESSENTIAL COOKIES ONLY ── */}
       <section className="mb-8 p-4 rounded-xl bg-slate-50 border border-slate-200">
         <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 mb-2">
           <Cookie className="w-4 h-4 text-slate-600" />
-          2. Essential Cookies Only Notice
+          3. Essential Cookies Notice & Technical Attributes
         </h2>
         <p className="text-xs text-slate-600 mb-2">
-          TrustFed uses <strong>strictly essential cookies</strong> required for application security and session integrity:
+          TrustFed uses <strong>strictly essential cookies</strong> required for application security and session integrity. The deployed environment sets:
         </p>
-        <ul className="list-disc pl-5 space-y-1 text-xs text-slate-600">
-          <li><strong>Refresh Token Cookie:</strong> An <code>HttpOnly</code>, <code>SameSite=Strict</code>, <code>Secure</code> cryptographic token used solely to refresh authenticated sessions for medical staff and administrators.</li>
-          <li><strong>CSRF Protection Cookie / Header:</strong> Used to protect authenticated requests against cross-site request forgery attacks.</li>
-        </ul>
+        <div className="overflow-x-auto text-xs my-3">
+          <table className="w-full border-collapse border border-slate-200 text-left">
+            <thead className="bg-slate-100 text-slate-700">
+              <tr>
+                <th className="p-2 border border-slate-200">Cookie Name</th>
+                <th className="p-2 border border-slate-200">Scope / Path</th>
+                <th className="p-2 border border-slate-200">Security Attributes</th>
+                <th className="p-2 border border-slate-200">Lifespan</th>
+                <th className="p-2 border border-slate-200">Purpose</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 text-slate-600">
+              <tr>
+                <td className="p-2 font-mono font-medium text-slate-800">tf_refresh_token</td>
+                <td className="p-2 font-mono">/api/v1/auth</td>
+                <td className="p-2 font-mono text-[11px]">HttpOnly; Secure; SameSite=Lax</td>
+                <td className="p-2">7 days (604800s)</td>
+                <td className="p-2">Secure token rotation for authenticated staff sessions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <p className="text-xs text-slate-500 mt-2 font-medium">
           <strong>Zero Tracking or Advertising Cookies:</strong> TrustFed does NOT use third-party analytics, marketing, behavioral tracking, or advertising cookies.
         </p>
       </section>
 
-      {/* ── SECTION 3: CLINICAL MODE (NOT ACTIVE) ── */}
+      {/* ── SECTION 4: CLINICAL MODE (NOT ACTIVE) ── */}
       <section className="mb-8 p-5 rounded-2xl bg-purple-50/40 border border-purple-200">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h2 className="text-base font-bold text-purple-950 flex items-center gap-2 m-0">
             <Lock className="w-5 h-5 text-purple-600" />
-            3. Clinical Mode Architecture [NOT ACTIVE]
+            4. Clinical Mode Architecture [NOT ACTIVE]
           </h2>
           <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-[10px] uppercase font-bold">
             NOT ACTIVE
@@ -122,10 +158,10 @@ export default function PrivacyPolicyPage() {
         </ul>
       </section>
 
-      {/* ── SECTION 4: NO STATUTORY COMPLIANCE CLAIMS ── */}
+      {/* ── SECTION 5: NO STATUTORY COMPLIANCE CLAIMS ── */}
       <section className="mb-6 p-4 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-700">
         <h3 className="text-xs font-bold uppercase text-slate-900 mb-1">
-          4. Regulatory Notice: No Statutory Compliance Claims
+          5. Regulatory Notice: No Statutory Compliance Claims
         </h3>
         <p className="m-0 leading-relaxed">
           TrustFed is an engineering research platform and does NOT claim formal certification, regulatory clearance, or statutory compliance with the Digital Personal Data Protection Act (DPDP), HIPAA, GDPR, or Software as a Medical Device (SaMD) directives. Achieving statutory compliance requires institutional legal review, Data Protection Officer appointments, institutional data sharing contracts, and independent third-party audits.

@@ -1,3 +1,4 @@
+import os
 import json
 import urllib.request
 import urllib.error
@@ -5,10 +6,10 @@ import http.cookiejar
 
 BACKEND_URL = "https://trustfed-backend.onrender.com/api/v1"
 ROLES_TO_TEST = [
-    ("hospital_staff", "hospital@trustfed.ai", "password123"),
-    ("doctor", "doctor@trustfed.ai", "password123"),
-    ("regional_admin", "regional@trustfed.ai", "password123"),
-    ("global_admin", "admin@trustfed.ai", "password123"),
+    ("hospital_staff", "hospital@trustfed.ai", os.getenv("TEST_STAFF_PASSWORD", "TrustFed2026!SecStaff")),
+    ("doctor", "doctor@trustfed.ai", os.getenv("TEST_DOCTOR_PASSWORD", "TrustFed2026!SecDoc")),
+    ("regional_admin", "regional@trustfed.ai", os.getenv("TEST_REGIONAL_PASSWORD", "TrustFed2026!SecReg")),
+    ("global_admin", "admin@trustfed.ai", os.getenv("TEST_ADMIN_PASSWORD", "TrustFed2026!SecAdmin")),
 ]
 
 def make_request(url, method="GET", data=None, headers=None, opener=None):

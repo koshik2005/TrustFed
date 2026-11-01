@@ -18,6 +18,7 @@
 6. [Model Rollback Procedure](#6-model-rollback-procedure)
 7. [Deployment Rollback Procedure](#7-deployment-rollback-procedure)
 8. [Uptime & Model Drift Monitoring Runbook](#8-uptime--model-drift-monitoring-runbook)
+9. [CI/CD Deployment Gate & Deploy Hooks Configuration](#9-cicd-deployment-gate--deploy-hooks-configuration)
 
 ---
 
@@ -235,4 +236,47 @@ When `GET /api/v1/model/monitoring` returns `drift_status.has_alerts = true`:
    - **`top1_mean_confidence < 0.50`**: Check for unexpected input values or out-of-distribution symptom descriptions. Consider retraining or activating baseline fallback.
    - **`red_flag_override_share > 0.30`**: Clinical review required. Check if automated emergency red-flag triggers are generating false alarms.
 2. Export daily metrics for clinical review team via `GET /api/v1/model/monitoring`.
+
+---
+
+## 9. CI/CD Deployment Gate & Deploy Hooks Configuration
+
+By default, git pushes to `main` trigger immediate builds on Render and Vercel regardless of CI results. To enforce the production gate (deployment **only** occurs after GitHub Actions checks pass):
+
+### 1. Render Dashboard Setup (Backend Auto-Deploy Disablement)
+1. Log into [Render Dashboard](https://dashboard.render.com).
+2. Click on the `trustfed-backend` Web Service.
+3. In the left navigation, select **Settings**.
+4. Scroll to **Build & Deploy**:
+   - Locate **Auto-Deploy**.
+   - Change setting from **Yes** to **No** (toggled off). Save changes.
+5. In the same **Build & Deploy** section:
+   - Locate **Deploy Hook**.
+   - Click **Add Deploy Hook** (or copy existing hook URL).
+   - Label: `GitHub Actions CI Gate (Main)`.
+   - Copy the webhook URL (e.g. `https://api.render.com/deploy/srv-xxxx?key=yyyy`).
+6. Navigate to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**.
+7. Click **New repository secret**:
+   - Name: `RENDER_DEPLOY_HOOK`
+   - Value: `<Render Deploy Hook URL>`
+
+### 2. Vercel Dashboard Setup (Frontend Auto-Deploy Gate)
+1. Log into [Vercel Dashboard](https://vercel.com).
+2. Select the `frontend-3qgo` project.
+3. Navigate to **Settings** -> **Git**.
+4. Scroll down to **Deploy Hooks**:
+   - Click **Create Hook**.
+   - Hook Name: `GitHub Actions CI Gate`.
+   - Branch: `main`.
+   - Click **Create Hook** and copy the resulting webhook URL (e.g. `https://api.vercel.com/v1/integrations/deploy/prj_xxxx/yyyy`).
+5. Scroll up to **Ignored Build Step**:
+   - Toggle to **Custom**.
+   - Enter command: `if [ "$VERCEL_GIT_COMMIT_REF" = "main" ] && [ -z "$VERCEL_DEPLOY_HOOK" ]; then exit 0; else exit 1; fi`
+   - Alternatively, toggle off "Automatically expose System Environment Variables" or disable automatic git commit builds.
+6. In your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**:
+   - Click **New repository secret**:
+   - Name: `VERCEL_DEPLOY_HOOK`
+   - Value: `<Vercel Deploy Hook URL>`
+
+Once configured, the GitHub Actions `deployment-gate` job triggers both deploy hooks only when `lint-and-typecheck`, `backend-tests`, `frontend-vitest`, and `playwright-e2e` have all executed with status 0.
 

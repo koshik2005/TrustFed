@@ -22,12 +22,12 @@ As required under Indian digital rules and governance best practices, our design
 
 | Field | Official Designation / Contact Information |
 | :--- | :--- |
-| **Grievance Officer Name** | Adv. Rajesh V. Sharma / Compliance Lead *(Placeholder pending formal appointment)* |
+| **Grievance Officer Name** | `[Grievance Officer Name - Pending Formal Appointment]` |
 | **Designation** | Nodal Grievance Redressal & Data Protection Officer |
 | **Organization** | TrustFed AI Health Research Consortium |
 | **Email Address** | `grievance-officer@trustfed.ai` |
 | **Security / Vulnerability Reporting** | `security@trustfed.ai` |
-| **Physical Address** | No. 42, Innovation Hub, Tech City, Bengaluru, Karnataka 560100, India *(Corporate/Academic Partner Placeholder)* |
+| **Physical Address** | `[Registered Office / Legal Entity Address - Pending Formal Incorporation, Bengaluru, Karnataka, India]` |
 | **Working Hours** | Monday through Friday, 09:30 AM to 05:30 PM IST (excluding public holidays) |
 
 ---

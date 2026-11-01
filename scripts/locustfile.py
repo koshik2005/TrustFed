@@ -40,6 +40,10 @@ class TrustFedUser(HttpUser):
     def test_health_endpoint(self):
         self.client.get("/health", name="/health")
 
+    @task(3)
+    def test_clinical_symptoms(self):
+        self.client.get("/api/v1/clinical/symptoms", name="/api/v1/clinical/symptoms")
+
     @task(5)
     def test_cardiac_prediction(self):
         payload = {
@@ -57,7 +61,7 @@ class TrustFedUser(HttpUser):
             "ca": 0,
             "thal": 3
         }
-        self.client.post("/prediction/predict", json=payload, headers=self.headers, name="/prediction/predict")
+        self.client.post("/api/v1/prediction/predict", json=payload, headers=self.headers, name="/api/v1/prediction/predict")
 
     @task(5)
     def test_clinical_differential(self):
@@ -78,8 +82,8 @@ class TrustFedUser(HttpUser):
                 "platelets": 210.0
             }
         }
-        self.client.post("/clinical/predict", json=payload, headers=self.headers, name="/clinical/predict")
+        self.client.post("/api/v1/clinical/predict", json=payload, headers=self.headers, name="/api/v1/clinical/predict")
 
     @task(2)
     def test_metrics_endpoint(self):
-        self.client.get("/metrics", name="/metrics")
+        self.client.get("/metrics", headers=self.headers, name="/metrics")

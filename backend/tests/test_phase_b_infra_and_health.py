@@ -13,6 +13,7 @@ from db.database import engine, Base, SessionLocal
 from db.migrations.v3_performance_indexes import migrate_up, migrate_down, INDEXES
 from core.metrics import LatencyTracker, predict_latency_tracker
 from api.v1.routes import get_cached_active_model, invalidate_active_model_cache
+from services import auth
 
 client = TestClient(app)
 
@@ -107,15 +108,32 @@ def test_latency_tracker_percentiles():
 
 
 def test_metrics_endpoint():
-    """Verify /metrics and /api/prediction/metrics return valid latency payloads."""
-    res = client.get("/metrics")
-    assert res.status_code == 200
-    data = res.json()
+    """Verify /metrics and /api/prediction/metrics require authentication or internal token."""
+    # 1. Unauthenticated request rejected with 401
+    unauth = client.get("/metrics")
+    assert unauth.status_code == 401, f"Expected 401, got {unauth.status_code}"
+    assert "Authentication required" in unauth.json()["detail"]
+
+    # 2. Access with internal token succeeds
+    res_internal = client.get("/metrics", headers={"X-Internal-Token": "trustfed-internal-metrics-secret"})
+    assert res_internal.status_code == 200
+    data = res_internal.json()
     assert data["status"] == "ok"
     assert "prediction_latency" in data
     assert "p50_ms" in data["prediction_latency"]
     assert "p95_ms" in data["prediction_latency"]
     assert "p99_ms" in data["prediction_latency"]
+
+    # 3. Access with valid user Bearer token succeeds
+    auth_tok = auth.create_token({"sub": "doc@trustfed.ai", "role": "doctor", "user_id": 1})
+    res_bearer = client.get("/metrics", headers={"Authorization": f"Bearer {auth_tok}"})
+    assert res_bearer.status_code == 200
+
+    # 4. /api/v1/prediction/metrics route is equally protected
+    res_pred_unauth = client.get("/api/v1/prediction/metrics")
+    assert res_pred_unauth.status_code == 401
+    res_pred_tok = client.get("/api/v1/prediction/metrics", headers={"X-Internal-Token": "trustfed-internal-metrics-secret"})
+    assert res_pred_tok.status_code == 200
 
 
 def test_model_cache_avoids_repeated_disk_io():

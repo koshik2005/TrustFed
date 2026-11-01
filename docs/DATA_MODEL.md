@@ -77,7 +77,7 @@ Authenticated healthcare providers, regional supervisors, and global administrat
 | `hospital_id` | `VARCHAR(64)` | Nullable, FK `hospitals.id` | `[INDIRECT-PHI]` | Hospital tenancy scope (strictly isolates staff/doctors). |
 | `must_reset_password` | `BOOLEAN` | DEFAULT `FALSE` | `[SYSTEM-METADATA]` | Flag requiring credential rotation upon next login. |
 | `status` | `VARCHAR(32)` | DEFAULT `'active'` | `[SYSTEM-METADATA]` | Account status: `'active'`, `'suspended'`. |
-| `password_hash` | `VARCHAR(255)` | NOT NULL | `[SYSTEM-METADATA]` | PBKDF2-SHA256 salted password hash ($100{,}000$ iterations). |
+| `password_hash` | `VARCHAR(255)` | NOT NULL | `[SYSTEM-METADATA]` | `bcrypt` salted password hash (work factor 12, OWASP standard; legacy PBKDF2-SHA256 fallback supported). |
 | `created_at` | `TIMESTAMPTZ` | DEFAULT `NOW()` | `[SYSTEM-METADATA]` | Account creation timestamp. |
 
 ---
@@ -128,6 +128,12 @@ Clinical evaluation encounters representing general disease assessments (fever, 
 
 ### 3.6. `diseases`
 Extensible taxonomy of clinical conditions managed by Global Administrators.
+
+> [!NOTE]
+> **Disease Taxonomy Reconciliation: 7 Relational Database Records vs. 18 Differential Inference Conditions**
+> - **7 Relational Seed Diseases (`models.Disease`)**: The relational database table `diseases` stores the initial 7 acute outpatient conditions (`common_cold`, `influenza`, `viral_fever`, `dengue`, `typhoid`, `gastroenteritis`, `uti`) seeded during Phase 1 for hospital edge nodes.
+> - **18 Multi-Class Inference Conditions (`GeneralDiseaseModel`)**: The general disease differential inference engine (`backend/services/general_disease_model.py`) and held-out validation benchmark cohort ($N = 1{,}080$) evaluate across 18 conditions (expanding the 7 core conditions to include `malaria`, `covid19`, `pneumonia`, `bronchitis`, `asthma`, `hypertension`, `type2_diabetes`, `anemia`, `migraine`, `allergic_rhinitis`, and `heart_disease`).
+> - Every API route, model card, and test specifies whether it interacts with the 7 relational table rows or the 18 differential inference categories.
 
 | Field Name | Type | Constraints | Privacy Class | Description |
 | :--- | :--- | :--- | :--- | :--- |

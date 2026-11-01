@@ -15,6 +15,7 @@ export interface User {
   hubId?: string;
   mustResetPassword?: boolean;
   status?: string;
+  mfaEnabled?: boolean;
   avatarUrl?: string;
 }
 

@@ -1400,8 +1400,8 @@ def predict(vitals: Dict[str, Any], db: Session = Depends(get_db), u: models.Use
 
 @router.get("/prediction/metrics")
 @router.get("/system/metrics")
-def prediction_metrics():
-    """Returns latency percentiles (p50, p95, p99) and summary stats for /predict."""
+def prediction_metrics(auth_ctx: dict = Depends(__import__("core.metrics_auth", fromlist=["verify_metrics_access"]).verify_metrics_access)):
+    """Returns latency percentiles (p50, p95, p99) protected by authentication or internal token."""
     return {
         "status": "ok",
         "prediction_latency": predict_latency_tracker.get_metrics(),
@@ -1521,8 +1521,8 @@ def get_intended_use():
 
 @router.get("/monitoring/sentry-test")
 @router.post("/monitoring/sentry-test")
-def trigger_sentry_test():
-    """Triggers a controlled test event to verify Sentry event ingestion and PHI scrubbing."""
+def trigger_sentry_test(admin: models.User = Depends(require("global_admin"))):
+    """Triggers a controlled test event to verify Sentry event ingestion and PHI scrubbing (global_admin required)."""
     import sentry_sdk
     from core.logging_config import before_send_scrubber
     dsn_configured = bool(os.getenv("SENTRY_DSN"))

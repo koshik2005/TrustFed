@@ -7,9 +7,11 @@ import os
 import secrets
 import time
 from typing import Any, Dict, Optional
+import bcrypt
 import jwt
 
 _ITER = 200_000
+BCRYPT_ROUNDS = 12
 INSECURE_SECRETS = {
     "", "default", "change-me", "secret", "password", "your-secret-key",
     "change-me-to-a-long-random-string", "test", "demo"
@@ -20,16 +22,26 @@ _KEYRING_CACHE: Optional[Dict[str, str]] = None
 
 
 def hash_password(pw: str) -> str:
-    salt = secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), _ITER).hex()
-    return f"pbkdf2_sha256${_ITER}${salt}${dk}"
+    """Hash password using bcrypt with work factor 12 (OWASP recommended standard)."""
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    hashed = bcrypt.hashpw(pw.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(pw: str, stored: str) -> bool:
+    """Verify password against stored hash supporting bcrypt (cost >= 12) and legacy PBKDF2."""
+    if not stored or not pw:
+        return False
     try:
-        _, it, salt, dk = stored.split("$")
-        cand = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), int(it)).hex()
-        return hmac.compare_digest(cand, dk)
+        # 1. Bcrypt hash format ($2a$, $2b$, $2y$)
+        if stored.startswith(("$2a$", "$2b$", "$2y$")):
+            return bcrypt.checkpw(pw.encode("utf-8"), stored.encode("utf-8"))
+        # 2. Legacy PBKDF2 fallback
+        if stored.startswith("pbkdf2_sha256$"):
+            _, it, salt, dk = stored.split("$")
+            cand = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), int(it)).hex()
+            return hmac.compare_digest(cand, dk)
+        return False
     except Exception:
         return False
 

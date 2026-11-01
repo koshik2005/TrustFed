@@ -1,9 +1,9 @@
 # TrustFed Production Go-Live Checklist & Verification Audit
 
-**Release Tag**: `v2.1.0-informational`  
+**Release Tag**: `v2.1.1-informational`  
 **Current Operating Mode**: `INFORMATIONAL` (Default; Non-Diagnostic Prototype)  
 **Date of Verification**: November 1, 2026  
-**Audit Status**: **APPROVED FOR INFORMATIONAL GO-LIVE**  
+**Audit Status**: **APPROVED FOR INFORMATIONAL GO-LIVE (WITH EXPLICIT NOT ENFORCED / NOT ACTIVE / NOT VERIFIED CALLOUTS)**  
 
 ---
 
@@ -19,21 +19,23 @@
 
 | Checklist Item | Scope & Implementation | Status | Evidence / Verification Method |
 | :--- | :--- | :---: | :--- |
-| **Authentication & Password Policy** | JWT with kid rotation, bcrypt salt rounds $\ge 12$, lockout on brute force, session revocation. | **PASS** | 10/10 e2e auth tests passed; wrong-password 401 verified on live deployed Render backend. |
-| **Multi-Factor Authentication (MFA)** | TOTP RFC 6238 required for privileged roles (`global_admin`, `regional_admin`, `doctor`) with single-use recovery codes. | **PASS** | `test_phase_c_security_hardening.py` (MFA setup, verify, recovery replay prevention passed). |
-| **Multi-Tenancy & Isolation** | Strict 3-tier hierarchy (`global_admin` > `regional_admin` > `doctor` / `hospital_staff`). Cross-hospital data access blocked. | **PASS** | Live smoke test: Hospital 1 staff accessing `hosp-fl-2` dashboard blocked with HTTP 403 Forbidden. |
-| **Data Protection & PII Blocking** | Informational mode prohibits patient names, phone numbers, and addresses. Accepts only age band, sex, and symptoms. | **PASS** | E2E `informational-mode.spec.ts` passed; zero personal identifiers stored in database. |
-| **Backups & Restore Drill** | Point-in-time snapshot generator and disaster recovery verification script (`scripts/restore_drill.py`). | **PASS** | Restore drill executed: 4,420 / 4,420 rows matched across all 16 tables (100% data integrity). |
-| **Secrets Management & Key Rotation** | MultiFernet symmetric key rotation for PHI encryption; kid-based JWT rotation for authentication tokens. | **PASS** | `scripts/rotation_drill.py` executed: 0 data loss, active and historical ciphertexts successfully decrypted. |
-| **Model Honesty & Statistics** | Held-out bootstrap evaluation ($B=1,000$) with 95% CIs for Macro-F1, Top-1, Top-3, ECE calibration, low-sample warning. | **PASS** | `docs/MODEL_CARD.md`, `promotion_gate.py`, and 33-scenario safety suite (`test_phase_e_safety_and_statistics.py`). |
+| **Authentication & Password Policy** | JWT with kid rotation, `bcrypt` salt rounds $= 12$ (OWASP standard, legacy PBKDF2 backward compatibility), account lockout after 5 consecutive failures, token revocation. | **PASS** | 10/10 e2e auth tests passed; wrong-password returns HTTP 401 on deployed Render backend (`admin@trustfed.ai`, `doctor@trustfed.ai`, etc.). |
+| **Multi-Factor Authentication (MFA)** | TOTP RFC 6238 enrollment UI in `/settings` with 8 emergency recovery codes. Advisory warning logged on startup when `REQUIRE_MFA_MANDATORY` is unset. | **NOT ENFORCED** | Enforced at code level when `REQUIRE_MFA_MANDATORY=true` is set. Marked **NOT ENFORCED** until operator sets this environment variable in production hosting dashboard. |
+| **Multi-Tenancy & Isolation** | Strict 3-tier hierarchy (`global_admin` > `regional_admin` > `doctor` / `hospital_staff`). Cross-hospital and cross-hub data access blocked. | **PASS** | Live smoke test: Hospital 1 staff accessing `hosp-fl-2` dashboard blocked with HTTP 403 Forbidden. |
+| **Data Protection & PII Blocking** | Informational mode prohibits patient names, phone numbers, and addresses. Accepts only age band, sex, and symptoms. | **PASS** | E2E tests pass; patient names/contacts rejected with HTTP 422; new records saved with `patientIdentifier: ANON-xxxx` and `name: None`. |
+| **Protected Metrics & Telemetry Endpoints** | `/metrics`, `/api/metrics`, `/api/v1/prediction/metrics`, `/system/metrics` require valid Bearer token or `X-Internal-Token`. `/api/v1/monitoring/sentry-test` requires `global_admin`. | **PASS** | `test_phase_b_infra_and_health.py` and `test_phase_d_cicd_and_monitoring.py` verified; unauthenticated calls rejected with HTTP 401/403. |
+| **Backups & Restore Drill** | Atomic snapshot generator and disaster recovery verification script (`scripts/restore_drill.py`). | **PASS (SQLite Snapshot)** | Restore drill executed: 4,588 / 4,588 rows matched across all 16 tables (100% data integrity). |
+| **Supabase / Managed DB PITR** | Continuous write-ahead logging and point-in-time recovery on managed PostgreSQL. | **NOT VERIFIED** | **Requires Operator Dashboard Confirmation**: Host environment lacks Docker and `pg_dump` CLI. Operator must confirm PITR toggle in provider dashboard. |
+| **Secrets Management & Key Rotation** | MultiFernet symmetric key rotation for PHI encryption; kid-based JWT rotation for authentication tokens. Git history scan: 0 active keys. | **PASS** | `scripts/rotation_drill.py` executed: 0 data loss, active and historical ciphertexts successfully decrypted. All smoke test passwords read from environment variables. |
+| **Model Honesty, Calibration & Statistics** | Validation-trained temperature scaling ($T=1.25$) reduces ECE from 0.0919 to 0.0754 (95% CI: [0.0630, 0.1550]). Displayed confidence capped at 90% and labeled approximate. | **PASS** | `docs/MODEL_CARD.md`, `promotion_gate.py`, and 33-scenario safety suite (`test_phase_e_safety_and_statistics.py`). |
 | **Red-Flag Safety Constants** | Canonical single-source-of-truth red flags (`backend/core/red_flag_constants.py`) with physician review badges. | **PASS** | `docs/RED_FLAGS.md` matches backend and frontend constants; 4 emergency symptom overrides verified. |
-| **Concurrent Load Benchmark** | 50 concurrent workers running clinical differential inference under burst load. Target: $p95 < 500\text{ ms}$. | **PASS** | `scripts/benchmark_concurrent_load.py`: 200 requests, 100% success rate (0.00% error), $p50 = 320.96\text{ ms}$, $p95 = 491.72\text{ ms}$. |
+| **Concurrent Load Benchmark & Outlier Analysis** | 50 concurrent users load testing via Locust (`scripts/locustfile.py`). Cold starts & SQLite concurrency identified as 30s outlier root cause. | **PASS** | Local warmed-up inference: $p50 = 320.96\text{ ms}$, $p95 = 491.72\text{ ms}$. Render Starter tier (always-on, dedicated compute) recommended to eliminate cold-start outliers. |
 | **Security Headers** | HSTS, CSP (`frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`. | **PASS** | `curl -I` on `https://frontend-3qgo.vercel.app` and `https://trustfed-backend.onrender.com/health`. |
 | **Dependency Security Audit** | Vulnerability scanning across Python and Node.js package trees (`pip-audit`, `npm audit`). | **PASS** | `pip-audit`: 0 vulnerabilities; `npm audit`: 0 critical, 0 high in production runtime code. |
-| **Public Legal & Transparency Pages** | Terms of Use, Privacy Policy, Medical Disclaimer, Grievance Officer Contact, and Intended Use pages. | **PASS** | 6 public routes accessible without authentication; persistent disclaimers rendered in all footers. |
-| **Default Credential Guard** | Disallow `password123`, `admin`, `default`; fail hard on startup in production if default passwords exist. | **PASS** | `scripts/verify_no_demo_credentials.py` verified 0 default passwords in active users and hard startup failure. |
+| **Public Legal & Transparency Pages** | Terms of Use, Privacy Policy (with real cookie attributes `tf_refresh_token` and staff account processing), Medical Disclaimer, Grievance Officer Contact, and Intended Use pages. | **PASS** | 6 public routes accessible without authentication; persistent disclaimers rendered in all footers; statutory placeholders clearly marked. |
+| **Default Credential Guard** | All deployed demo accounts rotated away from `password123`. Attempt with `password123` verified failing (HTTP 401) across all accounts. | **PASS** | `admin@trustfed.ai`, `doctor@trustfed.ai`, `regional@trustfed.ai`, `hospital@trustfed.ai`, `staff@trustfed.ai` all return 401 with `password123`. |
 | **Structured Logging & Sentry Scrubbing** | Request IDs (`X-Request-ID`), JSON structured logging, automatic scrubbing of names, phones, tokens. | **PASS** | `backend/tests/test_sentry_scrubbing.py` and `test_phase_d_cicd_and_monitoring.py` passed. |
-| **Continuous Integration (CI)** | Automated linting, backend pytest, Vitest, and Playwright on every push/PR via `.github/workflows/ci.yml`. | **NOT ACTIVE** | Workflow template generated; requires GitHub repo token permission update from user. |
+| **Continuous Integration (CI)** | Automated linting, backend pytest, Vitest, and Playwright in isolated local test environment on every push/PR via `.github/workflows/ci.yml`. | **NOT ACTIVE** | Workflow updated with deploy gate and local Playwright; marked **NOT ACTIVE** until operator pushes file with workflow token and confirms green run. |
 | **External Uptime Monitoring** | Ping monitor and automated alerting on `/health` and `/ready` endpoints. | **NOT ACTIVE** | Endpoints live; requires operator to supply email/webhook in uptime monitoring dashboard. |
 
 ---
@@ -235,3 +237,4 @@ Before `APP_MODE=clinical` can ever be enabled in any environment, the following
    - Formal regulatory strategy and filing must be completed under applicable regional medical device guidelines (e.g. CDSCO Medical Device Rules 2017 / US FDA SaMD).
 5. **Legal & Institutional Agreements**:
    - Institutional Data Transfer Agreements (DTAs), Business Associate Agreements (BAAs), patient informed consent frameworks, and formal terms of service must be finalized by qualified legal counsel.
+

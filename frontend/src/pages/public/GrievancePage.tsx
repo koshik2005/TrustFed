@@ -58,7 +58,7 @@ export default function GrievancePage() {
           <div className="space-y-2">
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Name & Designation</span>
-              <p className="font-bold text-slate-900 m-0">Adv. Rajesh V. Sharma / Compliance Lead [Placeholder]</p>
+              <p className="font-bold text-slate-900 m-0">[Grievance Officer Name - Pending Formal Statutory Appointment]</p>
               <p className="text-slate-500 m-0 text-[11px]">Nodal Grievance Redressal & Data Protection Officer</p>
             </div>
 
@@ -69,7 +69,7 @@ export default function GrievancePage() {
 
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Official Emails</span>
-              <p className="font-mono text-blue-600 m-0">grievance-officer@trustfed.ai</p>
+              <p className="font-mono text-blue-600 m-0">grievance-officer@trustfed.ai [Designated Email Placeholder]</p>
               <p className="font-mono text-slate-500 m-0 text-[11px]">security@trustfed.ai (Security & Vulnerabilities)</p>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function GrievancePage() {
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Registered Physical Address</span>
               <p className="text-slate-700 m-0 leading-normal flex items-start gap-1">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
-                No. 42, Innovation Hub, Tech City, Bengaluru, Karnataka 560100, India [Corporate/Academic Partner Placeholder]
+                [Registered Office / Legal Entity Address - Pending Formal Incorporation, Bengaluru, Karnataka, India]
               </p>
             </div>
 

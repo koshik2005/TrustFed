@@ -63,6 +63,18 @@ def validate_deployment_mode_on_startup() -> None:
     mode = get_app_mode()
     logger.info("TrustFed-Health operating mode: [%s]", mode.upper())
 
+    # Startup warning when MFA is not mandatory in informational and clinical mode
+    require_mfa_mandatory = os.getenv("REQUIRE_MFA_MANDATORY", "false").strip().lower() in ("true", "1", "yes")
+    if not require_mfa_mandatory:
+        warning_msg = (
+            "[SECURITY ADVISORY] REQUIRE_MFA_MANDATORY is not set to 'true'. "
+            "Multi-Factor Authentication (TOTP) is NOT enforced across all accounts. "
+            "Privileged accounts may authenticate with password alone. "
+            "To enforce mandatory TOTP, configure REQUIRE_MFA_MANDATORY=true."
+        )
+        logger.warning(warning_msg)
+        print(f"WARNING: {warning_msg}")
+
     if mode == "clinical":
         errors = []
 

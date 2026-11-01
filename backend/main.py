@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TrustFed-Health API",
-    version="2.0.0",
+    version="2.1.1",
     lifespan=lifespan,
     description="Federated learning with local DP, secure aggregation, exact SHAP and fairness auditing."
 )
@@ -156,7 +156,7 @@ app.include_router(api_router)
 @app.head("/")
 def root():
     from core.deployment_mode import get_app_mode
-    return {"message": "TrustFed-Health backend is running.", "status": "ok", "version": "2.0.0", "mode": get_app_mode()}
+    return {"message": "TrustFed-Health backend is running.", "status": "ok", "version": "2.1.1", "mode": get_app_mode()}
 
 
 @app.get("/health")
@@ -177,7 +177,7 @@ def health(db: Session = Depends(get_db)):
     return {
         "status": "healthy" if db_connected else "degraded",
         "database": "connected" if db_connected else "disconnected",
-        "version": "2.0.0",
+        "version": "2.1.1",
         "mode": get_app_mode()
     }
 
@@ -224,7 +224,7 @@ def readiness_check(response: Response, db: Session = Depends(get_db)):
         "status": "ready",
         "database": "connected",
         "model": "loaded",
-        "version": "2.0.0",
+        "version": "2.1.1",
         "mode": get_app_mode()
     }
 
@@ -233,8 +233,8 @@ def readiness_check(response: Response, db: Session = Depends(get_db)):
 @app.head("/metrics")
 @app.get("/api/metrics")
 @app.head("/api/metrics")
-def metrics():
-    """System & latency metrics endpoint including p50, p95, p99 for /predict."""
+def metrics(auth_ctx: dict = Depends(__import__("core.metrics_auth", fromlist=["verify_metrics_access"]).verify_metrics_access)):
+    """System & latency metrics endpoint protected by authentication or internal token."""
     from core.deployment_mode import get_app_mode
     from core.metrics import predict_latency_tracker
     return {

@@ -249,8 +249,30 @@ def test_sentry_before_send_scrubber_sanitizes_events():
 
 
 def test_sentry_test_endpoint_serves_scrubbed_sample():
-    """Verify GET /api/v1/monitoring/sentry-test returns 200 with scrubbed verification payload."""
-    res = client.get("/api/v1/monitoring/sentry-test")
+    """Verify /api/v1/monitoring/sentry-test requires global_admin and returns 200 with scrubbed payload."""
+    # 1. Unauthenticated request rejected
+    res_unauth = client.get("/api/v1/monitoring/sentry-test")
+    assert res_unauth.status_code == 401
+
+    # 2. Non-admin (doctor) rejected with 403 Forbidden
+    db = SessionLocal()
+    try:
+        doc_u = db.query(models.User).filter_by(role="doctor").first()
+        doc_tok = auth.create_token({"sub": doc_u.email, "role": "doctor", "user_id": doc_u.id})
+    finally:
+        db.close()
+    res_doc = client.get("/api/v1/monitoring/sentry-test", headers={"Authorization": f"Bearer {doc_tok}"})
+    assert res_doc.status_code == 403
+
+    # 3. Global admin succeeds
+    db = SessionLocal()
+    try:
+        admin_u = db.query(models.User).filter_by(role="global_admin").first()
+        admin_tok = auth.create_token({"sub": admin_u.email, "role": "global_admin", "user_id": admin_u.id})
+    finally:
+        db.close()
+
+    res = client.get("/api/v1/monitoring/sentry-test", headers={"Authorization": f"Bearer {admin_tok}"})
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
