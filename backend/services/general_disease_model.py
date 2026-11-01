@@ -635,8 +635,17 @@ def predict_differential(
         "suggestedRemedies": remedy_list,
     }
 
+    # Extract adaptive parameter hint if present
+    adaptive_hint = None
+    if adaptive_question and adaptive_question.get("question"):
+        adaptive_hint = f"Add {adaptive_question.get('parameter', 'parameter')} to improve this differential result"
+
     return {
         "modelVersion": model.version,
+        "datasetOrigin": "Public (UCI ML Repository) + Synthetic Supplement Cohort",
+        "dataset_origin": "Public (UCI ML Repository) + Synthetic Supplement Cohort",
+        "prototypeBenchmarkLabel": "Prototype Decision Support Benchmark - Not Clinically Validated",
+        "prototype_benchmark_label": "Prototype Decision Support Benchmark - Not Clinically Validated",
         "isFallback": False,
         "disclaimer": CLINICAL_DISCLAIMER,
         "redFlags": [rf.to_dict() for rf in red_flag_alerts],
@@ -646,5 +655,7 @@ def predict_differential(
         "topConfidence": top3[0]["probability"],
         "explanations": explanations,
         "adaptiveQuestion": adaptive_question,
+        "adaptiveHint": adaptive_hint,
+        "adaptive_hint": adaptive_hint,
         "suggestedClinicalGuidance": suggested_clinical_guidance
     }

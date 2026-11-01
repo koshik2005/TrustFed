@@ -259,3 +259,4 @@ def test_sentry_test_endpoint_serves_scrubbed_sample():
     sample = data["scrubbed_sample"]
     assert "[REDACTED_PATIENT_ID]" in sample["request"]["url"]
     assert sample["request"]["headers"]["Authorization"] == "[REDACTED_HEADER]"
+

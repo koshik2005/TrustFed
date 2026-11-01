@@ -235,3 +235,4 @@ When `GET /api/v1/model/monitoring` returns `drift_status.has_alerts = true`:
    - **`top1_mean_confidence < 0.50`**: Check for unexpected input values or out-of-distribution symptom descriptions. Consider retraining or activating baseline fallback.
    - **`red_flag_override_share > 0.30`**: Clinical review required. Check if automated emergency red-flag triggers are generating false alarms.
 2. Export daily metrics for clinical review team via `GET /api/v1/model/monitoring`.
+

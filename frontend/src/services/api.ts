@@ -428,6 +428,11 @@ export const clinicalApi = {
     const res = await apiClient.post('/clinical/predict', payload);
     return res.data;
   },
+
+  getModelInfo: async (): Promise<any> => {
+    const res = await apiClient.get('/model/info');
+    return res.data;
+  },
 };
 
 export const federatedApi = {

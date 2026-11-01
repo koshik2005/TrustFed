@@ -1414,6 +1414,25 @@ def model_monitoring_dashboard():
     return model_monitor.get_monitoring_report()
 
 
+# In-memory cache for bootstrap evaluation
+_CACHED_BOOTSTRAP_EVALUATION = None
+
+@router.get("/model/info")
+@router.get("/model/evaluation")
+def get_model_info():
+    """Returns model metadata, bootstrap 95% confidence intervals, and per-disease metrics."""
+    global _CACHED_BOOTSTRAP_EVALUATION
+    if _CACHED_BOOTSTRAP_EVALUATION is None:
+        from services.evaluation import run_evaluation
+        _CACHED_BOOTSTRAP_EVALUATION = run_evaluation(seed=42, n_bootstrap=1000)
+    return {
+        "status": "ok",
+        "evaluation": _CACHED_BOOTSTRAP_EVALUATION,
+        "disclaimer": deployment_mode.PERSISTENT_DISCLAIMER
+    }
+
+
+
 @router.get("/monitoring/sentry-test")
 @router.post("/monitoring/sentry-test")
 def trigger_sentry_test():

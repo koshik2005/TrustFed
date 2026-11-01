@@ -3,56 +3,61 @@
 **Model Identifier**: `TF-GenDisease-v1.0`  
 **Architecture**: Calibrated Multinomial Diagnostic Linear Model ($W \in \mathbb{R}^{55 \times 18}, b \in \mathbb{R}^{18}$)  
 **Task**: Multi-class differential diagnosis across 18 common outpatient and emergency conditions.  
-**Federated Learning Compatibility**: Weight-averaging compatible (FedAvg & TEFL DP-SGD).
+**Federated Learning Compatibility**: Weight-averaging compatible (FedAvg & TEFL DP-SGD).  
+**Dataset Origin**: Public (UCI ML Repository) + Synthetic Supplement Cohort (N=1,080)  
+**Status**: **Prototype Decision Support Benchmark - Not Clinically Validated**
 
 ---
 
-## 1. Multi-Dimensional Performance Summary
+## 1. Multi-Dimensional Performance Summary (with Bootstrap 95% Confidence Intervals)
 
 > [!IMPORTANT]
-> **No Headline Accuracy Claim**: In accordance with rigorous clinical evaluation standards, TrustFed AI does not cite a single oversimplified headline accuracy metric. Clinical diagnostic performance is reported through multi-class Top-3 coverage, Macro-F1, and Expected Calibration Error (ECE).
+> **No Headline Accuracy Claim & Rigorous Statistical Reporting**: In accordance with clinical machine learning evaluation standards, TrustFed AI reports all primary metrics alongside non-parametric bootstrap 95% confidence intervals ($B = 1000$ iterations on held-out test cohort $N = 216$).
 
-| Metric | Held-Out Test Evaluation | Clinical Interpretation |
-| :--- | :--- | :--- |
-| **Top-3 Differential Coverage** | **86.1%** | In 86.1% of cases, the true diagnosis is included in the top-3 differential presented to the physician. |
-| **Top-1 Strict Accuracy** | **61.1%** | Strict top-1 exact match on presenting clinical features. |
-| **Macro-F1 Score** | **0.572** | Unweighted average harmonic mean across all 18 condition classes. |
-| **Macro Precision** | **0.601** | Average positive predictive value across conditions. |
-| **Macro Recall** | **0.599** | Average clinical sensitivity across conditions. |
-| **Expected Calibration Error (ECE)** | **0.0919** | Quantifies probability calibration. Low ECE indicates predicted probabilities closely match empirical probabilities. |
-
----
-
-## 2. Per-Condition Performance Breakdown
-
-Evaluated on $N = 216$ held-out test cohort across all 18 clinical phenotypes:
-
-| Disease Code | Clinical Condition Name | Test Support | Precision | Recall | F1-Score |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| `common_cold` | Common Cold (Viral Rhinitis) | 11 | 0.000 | 0.000 | **0.000** |
-| `influenza` | Influenza (Seasonal Flu) | 15 | 1.000 | 0.533 | **0.696** |
-| `viral_fever` | Acute Viral Pyrexia | 8 | 0.000 | 0.000 | **0.000** |
-| `dengue` | Dengue Fever (Breakbone Fever) | 12 | 0.440 | 0.917 | **0.595** |
-| `typhoid` | Typhoid Enteric Fever | 10 | 0.556 | 0.500 | **0.526** |
-| `malaria` | Malaria | 16 | 0.381 | 0.500 | **0.432** |
-| `covid19` | COVID-19 / Acute Respiratory Illness | 17 | 1.000 | 0.765 | **0.867** |
-| `gastroenteritis` | Acute Gastroenteritis | 10 | 0.571 | 0.400 | **0.471** |
-| `uti` | Urinary Tract Infection | 19 | 0.933 | 0.737 | **0.824** |
-| `pneumonia` | Community-Acquired Pneumonia | 12 | 0.412 | 0.583 | **0.483** |
-| `bronchitis` | Acute Bronchitis | 14 | 0.643 | 0.643 | **0.643** |
-| `asthma` | Bronchial Asthma Exacerbation | 12 | 1.000 | 0.333 | **0.500** |
-| `hypertension` | Essential Hypertension | 9 | 0.500 | 1.000 | **0.667** |
-| `type2_diabetes` | Type 2 Diabetes Mellitus | 9 | 0.556 | 0.556 | **0.556** |
-| `anemia` | Iron Deficiency / Nutritional Anemia | 10 | 0.636 | 0.700 | **0.667** |
-| `migraine` | Migraine / Vascular Cephalea | 10 | 0.750 | 0.900 | **0.818** |
-| `allergic_rhinitis` | Allergic Rhinitis (Hay Fever) | 12 | 0.647 | 0.917 | **0.759** |
-| `heart_disease` | Coronary Artery Disease (CAD) | 10 | 0.800 | 0.800 | **0.800** |
+| Metric | Point Estimate | Bootstrap 95% CI | Clinical Interpretation |
+| :--- | :---: | :---: | :--- |
+| **Top-3 Differential Coverage** | **86.1%** | [81.9%, 90.7%] | In 86.1% of cases, the true diagnosis is included in the top-3 differential presented to the physician. |
+| **Top-1 Strict Accuracy** | **61.1%** | [54.6%, 67.1%] | Strict top-1 exact match on presenting clinical features. |
+| **Macro-F1 Score** | **0.572** | [0.504, 0.624] | Unweighted average harmonic mean across all 18 condition classes. |
+| **Macro Precision** | **0.601** | [0.543, 0.651] | Average positive predictive value across conditions. |
+| **Macro Recall** | **0.599** | [0.541, 0.657] | Average clinical sensitivity across conditions. |
+| **Expected Calibration Error (ECE)** | **0.0919** | [0.0690, 0.1660] | Quantifies probability calibration. Low ECE indicates predicted probabilities closely match empirical probabilities. |
 
 ---
 
-## 3. Probability Calibration (ECE & Reliability Bins)
+## 2. Per-Condition Performance Breakdown & Sample Count Audit
 
-Predicted probabilities are scaled using temperature calibration ($T = 1.0$). Bins evaluate confidence versus empirical accuracy:
+Evaluated on $N = 216$ held-out test cohort across all 18 clinical phenotypes.  
+> [!WARNING]
+> **Low-Confidence Flag ($N < 20$)**: In accordance with Phase E clinical safety standards, any disease category with fewer than 20 held-out test samples is explicitly flagged as **"low confidence"**. Such metrics should be interpreted with clinical caution pending larger consortium cohorts.
+
+| Disease Code | Clinical Condition Name | Test Support ($N$) | Confidence Tier | Precision (95% CI) | Recall (95% CI) | F1-Score (95% CI) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `common_cold` | Common Cold (Viral Rhinitis) | 11 | ⚠️ low confidence | 0.000 [0.00, 0.00] | 0.000 [0.00, 0.00] | **0.000** [0.00, 0.00] |
+| `influenza` | Influenza (Seasonal Flu) | 15 | ⚠️ low confidence | 1.000 [1.00, 1.00] | 0.533 [0.26, 0.79] | **0.696** [0.41, 0.88] |
+| `viral_fever` | Acute Viral Pyrexia | 8 | ⚠️ low confidence | 0.000 [0.00, 0.00] | 0.000 [0.00, 0.00] | **0.000** [0.00, 0.00] |
+| `dengue` | Dengue Fever (Breakbone Fever) | 12 | ⚠️ low confidence | 0.440 [0.25, 0.64] | 0.917 [0.73, 1.00] | **0.595** [0.39, 0.76] |
+| `typhoid` | Typhoid Enteric Fever | 10 | ⚠️ low confidence | 0.556 [0.25, 0.88] | 0.500 [0.20, 0.83] | **0.526** [0.22, 0.78] |
+| `malaria` | Malaria | 16 | ⚠️ low confidence | 0.381 [0.16, 0.60] | 0.500 [0.23, 0.75] | **0.432** [0.19, 0.61] |
+| `covid19` | COVID-19 / Acute Respiratory Illness | 17 | ⚠️ low confidence | 1.000 [1.00, 1.00] | 0.765 [0.54, 0.94] | **0.867** [0.70, 0.97] |
+| `gastroenteritis` | Acute Gastroenteritis | 10 | ⚠️ low confidence | 0.571 [0.17, 1.00] | 0.400 [0.11, 0.75] | **0.471** [0.13, 0.74] |
+| `uti` | Urinary Tract Infection | 19 | ⚠️ low confidence | 0.933 [0.75, 1.00] | 0.737 [0.53, 0.93] | **0.824** [0.65, 0.94] |
+| `pneumonia` | Community-Acquired Pneumonia | 12 | ⚠️ low confidence | 0.412 [0.18, 0.67] | 0.583 [0.30, 0.88] | **0.483** [0.23, 0.71] |
+| `bronchitis` | Acute Bronchitis | 14 | ⚠️ low confidence | 0.643 [0.38, 0.89] | 0.643 [0.38, 0.91] | **0.643** [0.40, 0.83] |
+| `asthma` | Bronchial Asthma Exacerbation | 12 | ⚠️ low confidence | 1.000 [1.00, 1.00] | 0.333 [0.09, 0.64] | **0.500** [0.17, 0.78] |
+| `hypertension` | Essential Hypertension | 9 | ⚠️ low confidence | 0.500 [0.25, 0.75] | 1.000 [1.00, 1.00] | **0.667** [0.40, 0.86] |
+| `type2_diabetes` | Type 2 Diabetes Mellitus | 9 | ⚠️ low confidence | 0.556 [0.20, 0.90] | 0.556 [0.21, 0.90] | **0.556** [0.22, 0.82] |
+| `anemia` | Iron Deficiency / Nutritional Anemia | 10 | ⚠️ low confidence | 0.636 [0.29, 0.90] | 0.700 [0.40, 1.00] | **0.667** [0.38, 0.86] |
+| `migraine` | Migraine / Vascular Cephalea | 10 | ⚠️ low confidence | 0.750 [0.50, 1.00] | 0.900 [0.67, 1.00] | **0.818** [0.61, 0.97] |
+| `allergic_rhinitis` | Allergic Rhinitis (Hay Fever) | 12 | ⚠️ low confidence | 0.647 [0.41, 0.88] | 0.917 [0.73, 1.00] | **0.759** [0.55, 0.91] |
+| `heart_disease` | Coronary Artery Disease (CAD) | 10 | ⚠️ low confidence | 0.800 [0.50, 1.00] | 0.800 [0.50, 1.00] | **0.800** [0.50, 0.96] |
+
+---
+
+## 3. Probability Calibration (ECE & Reliability Diagram)
+
+Expected Calibration Error (ECE): **0.0919** (95% CI: [0.0690, 0.1660]).  
+Predicted probabilities are calibrated via temperature scaling ($T = 1.0$). Bins evaluate confidence versus empirical accuracy:
 
 | Confidence Bin | Sample Count | Mean Confidence | Empirical Accuracy | Calibration Gap |
 | :---: | :---: | :---: | :---: | :---: |
@@ -66,41 +71,52 @@ Predicted probabilities are scaled using temperature calibration ($T = 1.0$). Bi
 | 0.8-0.9 | 24 | 0.852 | 0.833 | 0.019 |
 | 0.9-1.0 | 61 | 0.967 | 0.820 | 0.147 |
 
+### Reliability Diagram (Visual Calibration Chart)
+
+```text
+Confidence Bin | Samples | Conf   | Acc    | Reliability Chart (C = Mean Conf, A = Empirical Acc)
+---------------+---------+--------+--------+-------------------------------------------------------
+0.1-0.2        |       3 | 0.173  | 0.333  | [     C   A                    ]
+0.2-0.3        |      11 | 0.257  | 0.273  | [       CA                     ]
+0.3-0.4        |      24 | 0.354  | 0.292  | [        A C                   ]
+0.4-0.5        |      24 | 0.449  | 0.542  | [             C  A             ]
+0.5-0.6        |      26 | 0.543  | 0.500  | [               AC             ]
+0.6-0.7        |      21 | 0.643  | 0.524  | [               A   C          ]
+0.7-0.8        |      22 | 0.747  | 0.636  | [                   A  C       ]
+0.8-0.9        |      24 | 0.852  | 0.833  | [                        AC    ]
+0.9-1.0        |      61 | 0.967  | 0.820  | [                        A    C]
+---------------+---------+--------+--------+-------------------------------------------------------
+Legend: [C = Mean Predicted Confidence, A = Empirical Accuracy, * = Perfect Alignment]
+```
+
 ---
 
-## 4. Native Missingness Handling & Adaptive Questioning
+## 4. Promotion Gate Specification
 
-1. **Native Missingness Indicators**: Continuous vitals (Temp, BP, HR, SpO2, Resp Rate, Glucose) and labs (Platelets, WBC) are accompanied by binary indicators (`is_missing_<feature>`). Rather than imputing with artifacts, the model learns the clinical context of missing diagnostic investigations.
-2. **Adaptive Questioning**: When top-1 probability is below 0.65, the inference engine computes the Expected Information Gain (EIG) over currently unmeasured parameters and surfaces the single most decisive observation to the clinician (e.g., *"Add SpO2 to improve this result"*).
+Model updates in federated rounds or retraining cycles must pass the statistical **Promotion Gate** ([promotion_gate.py](file:///d:/projects/TrustFed/backend/services/promotion_gate.py)) before deployment:
+1. **Macro-F1 Improvement CI**: The LOWER bound of the bootstrap 95% CI of $\Delta \text{Macro-F1}$ must be strictly positive ($	ext{CI}_{	ext{lower}} > 0$). Tiny, statistically insignificant gains (where $\text{CI}_{\text{lower}} \le 0$) are rejected.
+2. **Zero Severe Regression**: No single disease condition may experience a recall drop greater than $2.0\%$.
+3. **No Fairness Degradation**: Disparity across demographic groups (e.g. biological sex) must not increase by more than $1.0\%$.
 
 ---
 
 ## 5. Red-Flag Safety Overrides
 
-The model is bound by deterministic clinical safety guardrails ([red_flags.py](file:///d:/projects/TrustFed/backend/services/red_flags.py)) that trigger immediate urgent warnings overriding routine ambulatory outputs:
-- **Acute Coronary Syndrome (ACS)**: Chest pain with diaphoresis, dyspnea, tachycardia, or ST deviation.
-- **Severe Hypoxemia**: Measured $\text{SpO}_2 < 92\%$.
-- **Acute Stroke**: Positive FAST neurological indicators (facial droop, arm weakness, speech difficulty).
-- **Suspected Meningitis**: Pyrexia combined with nuchal rigidity / neck stiffness.
-- **High Fever in Infant**: Age $< 1$ year with core temperature $\ge 38.5^\circ\text{C}$.
-- **Hypovolemic Shock**: Severe dehydration from vomiting/diarrhea with systolic $\text{BP} < 90\text{ mmHg}$ or tachycardia with shock indicators.
-
-> [!CAUTION]
-> **Threshold Status — Pending Physician Review**:
-> All numerical thresholds ($\text{SpO}_2 < 92\%$, $\text{HR} \ge 120\text{ bpm}$, systolic $\text{BP} < 90\text{ mmHg}$, temperature $\ge 38.0^\circ\text{C} / 38.5^\circ\text{C}$) are conservative heuristic starting points labeled **"Pending Physician Review"**. They have not been independently validated in clinical trials and require formal review, calibration, and sign-off by a licensed clinician before any live healthcare deployment. Tachycardia ($\text{HR} \ge 120\text{ bpm}$) is evaluated in conjunction with concurrent physiological signs (presenting chest pain, acute fluid loss, diaphoresis, or hypotension).
+The model is bound by deterministic clinical safety guardrails ([red_flags.py](file:///d:/projects/TrustFed/backend/services/red_flags.py)) and canonical constants ([red_flag_constants.py](file:///d:/projects/TrustFed/backend/core/red_flag_constants.py)).  
+All rules are labeled **"pending physician review"**:
+- **Acute Coronary Syndrome (ACS)**: Chest pain with diaphoresis, dyspnea, tachycardia ($\text{HR} \ge 120\text{ bpm}$), or ST deviation.
+- **Severe Hypoxemia**: Measured $\text{SpO}_2 < 92.0\%$.
+- **Acute Stroke (FAST)**: Positive FAST neuro-deficit indicators (facial droop, arm weakness, speech difficulty).
+- **Suspected Meningitis**: Pyrexia combined with nuchal rigidity / stiff neck.
+- **High Fever in Infant**: Age $\le 1\text{ year}$ with temperature $\ge 38.5^\circ\text{C}$.
+- **Hypovolemic Shock**: Fluid loss (vomiting/diarrhea) with systolic $\text{BP} < 90\text{ mmHg}$ or tachycardia.
+- **Hypertensive Crisis**: Systolic $\text{BP} \ge 180\text{ mmHg}$ or diastolic $\text{BP} \ge 120\text{ mmHg}$.
+- **Critical Bradycardia**: Resting heart rate $\text{HR} < 40\text{ bpm}$.
 
 ---
 
 ## 6. Known Limitations & Clinical Caution
 
-1. **Synthetic & Clean Baseline Cohort**: The baseline pre-training supplement was generated from validated medical phenotype distributions. Real-world emergency room presentations involve complex polypharmacy, multi-morbidity, and inconsistent patient histories.
-2. **Ambulatory vs Emergency Triage**: Model weights represent initial clinical triage likelihoods and must never replace diagnostic investigations (cultures, imaging, ECG).
+1. **Synthetic & Public Benchmark Cohort**: Pre-training baseline incorporates public UCI repository data and synthetic clinical supplement ($N=1,080$).
+2. **Prototype Benchmark Status**: This service is an informational/educational prototype benchmark, NOT a clinically validated diagnostic device.
 3. **Mandatory Clinician Verification**: All suggested causes and remedies are labeled: *"Suggested, clinician must verify."*
-
----
-
-## 7. Dataset Origin, Per-Disease Sample Distribution, and Prototype Benchmark Status
-
-- **Dataset Origin**: Pre-training baseline draws from public UCI Machine Learning repository datasets (Cleveland Heart Disease, Dermatology condition profiles) combined with a clearly labeled synthetic clinical supplement ($N=1,080$ total encounters: 864 training / 216 held-out test) generated based on clinical distributions in `backend/data/generate_clinical_supplement.py` and documented in `docs/DATASETS.md`.
-- **Per-Disease Sample Distribution**: Total dataset comprises $N=1,080$ encounters (60 cases per disease class across the 18 conditions: 48 training / 12 test support per class).
-- **Prototype Benchmark Status**: This system is an algorithmic decision-support **prototype benchmark, NOT a clinically validated medical device**. All metrics reported are prototype benchmark figures; real-world clinical accuracy on diverse uncurated hospital cohorts will be lower. All recommendations must be confirmed by a licensed clinician before any clinical action.
