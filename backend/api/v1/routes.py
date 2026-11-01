@@ -1739,8 +1739,18 @@ def _resolve_hospital_scope(u: models.User, target_hospital_id: Optional[str] = 
 
 
 def _patient_json(p: models.Patient, include_phi: bool = True) -> Dict[str, Any]:
-    name = crypto.decrypt_phi(p.name_encrypted) if (include_phi and p.name_encrypted) else None
-    contact = crypto.decrypt_phi(p.contact_encrypted) if (include_phi and p.contact_encrypted) else None
+    name = None
+    contact = None
+    if include_phi and p.name_encrypted:
+        try:
+            name = crypto.decrypt_phi(p.name_encrypted)
+        except Exception:
+            name = "[Encrypted / Key Mismatch]"
+    if include_phi and p.contact_encrypted:
+        try:
+            contact = crypto.decrypt_phi(p.contact_encrypted)
+        except Exception:
+            contact = "[Encrypted / Key Mismatch]"
     return {
         "id": p.id,
         "patientIdentifier": p.patient_identifier,
@@ -1763,24 +1773,46 @@ def _encounter_json(e: models.Encounter, patient: Optional[models.Patient] = Non
         if doc:
             conf_by_name = doc.name
 
-    symptoms_list = json.loads(e.symptoms) if e.symptoms else []
-    vitals_dict = json.loads(e.vitals) if e.vitals else {}
-    labs_dict = json.loads(e.optional_labs) if e.optional_labs else {}
+    try:
+        symptoms_list = json.loads(e.symptoms) if e.symptoms else []
+    except Exception:
+        symptoms_list = []
+    try:
+        vitals_dict = json.loads(e.vitals) if e.vitals else {}
+    except Exception:
+        vitals_dict = {}
+    try:
+        labs_dict = json.loads(e.optional_labs) if e.optional_labs else {}
+    except Exception:
+        labs_dict = {}
 
     # Real-time differential evaluation for red-flags, explanations, and guidance
-    eval_res = general_disease_model.predict_differential(
-        age=patient.age if patient else 40,
-        sex=patient.sex if patient else 0,
-        symptoms=symptoms_list,
-        symptom_duration_days=e.symptom_duration_days or 1,
-        vitals=vitals_dict,
-        optional_labs=labs_dict,
-        structured_ecg=e.structured_ecg_finding,
-        hospital_confirmed_records=[
-            {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
-            for c in db.query(models.Encounter).filter_by(hospital_id=e.hospital_id, trainable=True).all()
-        ] if db else None
-    )
+    try:
+        eval_res = general_disease_model.predict_differential(
+            age=patient.age if patient else 40,
+            sex=patient.sex if patient else 0,
+            symptoms=symptoms_list,
+            symptom_duration_days=e.symptom_duration_days or 1,
+            vitals=vitals_dict,
+            optional_labs=labs_dict,
+            structured_ecg=e.structured_ecg_finding,
+            hospital_confirmed_records=[
+                {"doctorConfirmedDiagnosis": c.doctor_confirmed_diagnosis, "cause": c.cause, "treatment": c.treatment}
+                for c in db.query(models.Encounter).filter_by(hospital_id=e.hospital_id, trainable=True).all()
+            ] if db else None
+        )
+    except Exception:
+        eval_res = {
+            "predictedTop3": [],
+            "modelVersion": "v2-general-disease-2026",
+            "redFlags": [],
+            "hasCriticalRedFlag": False,
+            "adaptiveQuestion": None,
+            "explanations": {},
+            "suggestedClinicalGuidance": "Standard supportive care.",
+            "disclaimer": "Informational evaluation only.",
+            "isFallback": True,
+        }
 
     res = {
         "id": e.id,

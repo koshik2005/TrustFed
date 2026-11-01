@@ -760,6 +760,14 @@ def seed_synthetic_data(db: Session, force: bool = False):
             db.add(pat)
             db.commit()
             db.refresh(pat)
+        else:
+            # If encryption key changed or rotated, heal synthetic patient records with active key
+            try:
+                crypto.decrypt_phi(pat.name_encrypted)
+            except Exception:
+                pat.name_encrypted = crypto.encrypt_phi(sp["name"])
+                pat.contact_encrypted = crypto.encrypt_phi(sp["contact"])
+                db.commit()
 
         enc_id = f"ENC-{sp['identifier']}"
         enc = db.query(models.Encounter).filter_by(encounter_identifier=enc_id).first()
