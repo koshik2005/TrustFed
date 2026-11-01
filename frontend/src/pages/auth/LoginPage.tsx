@@ -12,11 +12,11 @@ import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import PublicFooter from '@/components/common/PublicFooter';
 
-const DEMO_EMAIL: Record<UserRole, string> = {
-  hospital_staff: 'hospital@trustfed.ai',
-  doctor: 'doctor@trustfed.ai',
-  regional_admin: 'regional@trustfed.ai',
-  global_admin: 'admin@trustfed.ai',
+const DEMO_CREDENTIALS: Record<UserRole, { email: string; pass: string }> = {
+  hospital_staff: { email: 'hospital@trustfed.ai', pass: 'TrustFed2026!SecStaff' },
+  doctor: { email: 'doctor@trustfed.ai', pass: 'TrustFed2026!SecDoc' },
+  regional_admin: { email: 'regional@trustfed.ai', pass: 'TrustFed2026!SecReg' },
+  global_admin: { email: 'admin@trustfed.ai', pass: 'TrustFed2026!SecAdmin' },
 };
 
 const ROLES: { id: UserRole; title: string; desc: string; icon: string }[] = [
@@ -28,7 +28,7 @@ const ROLES: { id: UserRole; title: string; desc: string; icon: string }[] = [
 export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>('hospital_staff');
   const [email, setEmail] = useState('hospital@trustfed.ai');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('TrustFed2026!SecStaff');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login, isBackendWakingUp, appMode } = useAuthStore();
@@ -56,10 +56,10 @@ export default function LoginPage() {
 
   const handleQuickDemoAccess = async (role: UserRole) => {
     setSelectedRole(role);
-    const targetEmail = DEMO_EMAIL[role];
-    setEmail(targetEmail);
-    setPassword('password123');
-    await submitLogin(targetEmail, 'password123');
+    const cred = DEMO_CREDENTIALS[role];
+    setEmail(cred.email);
+    setPassword(cred.pass);
+    await submitLogin(cred.email, cred.pass);
   };
 
   return (
@@ -143,8 +143,8 @@ export default function LoginPage() {
                     key={role.id}
                     onClick={() => {
                       setSelectedRole(role.id);
-                      setEmail(DEMO_EMAIL[role.id]);
-                      setPassword('password123');
+                      setEmail(DEMO_CREDENTIALS[role.id].email);
+                      setPassword(DEMO_CREDENTIALS[role.id].pass);
                     }}
                     className={cn(
                       "cursor-pointer rounded-xl border p-3 text-center transition-all duration-200 relative overflow-hidden",

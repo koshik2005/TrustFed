@@ -712,9 +712,15 @@ def seed_synthetic_data(db: Session, force: bool = False):
             ))
     db.commit()
 
-    # 4. Role-based Demo Accounts
-    pw = os.getenv("DEMO_PASSWORD", "password123")
+    # 4. Role-based Demo Accounts (Strictly use secure non-default credentials)
+    role_passwords = {
+        "global_admin": os.getenv("TEST_ADMIN_PASSWORD", "TrustFed2026!SecAdmin"),
+        "regional_admin": os.getenv("TEST_REGIONAL_PASSWORD", "TrustFed2026!SecReg"),
+        "hospital_staff": os.getenv("TEST_STAFF_PASSWORD", "TrustFed2026!SecStaff"),
+        "doctor": os.getenv("TEST_DOCTOR_PASSWORD", "TrustFed2026!SecDoc"),
+    }
     for email, name, role, hub_id, hosp_id in DEMO_USERS:
+        pw = role_passwords.get(role, "TrustFed2026!SecStaff")
         u = db.query(models.User).filter_by(email=email).first()
         if not u:
             db.add(models.User(
@@ -734,6 +740,7 @@ def seed_synthetic_data(db: Session, force: bool = False):
             u.hospital_id = hosp_id
             if u.password_hash.startswith("DISABLED$") or not auth.verify_password(pw, u.password_hash):
                 u.password_hash = auth.hash_password(pw)
+                u.status = "active"
     db.commit()
 
     # 5. Synthetic Patients with encrypted PHI

@@ -108,7 +108,7 @@ describe('LoginPage Security Invariants & Error Handling', () => {
     fireEvent.click(hospitalDemoBtn!);
 
     await waitFor(() => {
-      expect(api.authApi.login).toHaveBeenCalledWith('hospital@trustfed.ai', 'password123');
+      expect(api.authApi.login).toHaveBeenCalledWith('hospital@trustfed.ai', 'TrustFed2026!SecStaff');
       expect(screen.getByText('Invalid email or password.')).not.toBeNull();
     });
 
