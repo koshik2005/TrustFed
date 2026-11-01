@@ -63,21 +63,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-slate-50 overflow-hidden p-6 font-sans text-slate-900">
+    <div className="relative min-h-screen w-full flex flex-col justify-between items-center bg-slate-50 overflow-x-hidden p-4 sm:p-6 font-sans text-slate-900">
       {/* Background radial gradient glow */}
       <div 
         className="absolute inset-0 z-0 pointer-events-none"
         style={{ background: 'radial-gradient(circle at top center, rgba(59, 130, 246, 0.15) 0%, rgba(6, 182, 212, 0.05) 40%, transparent 70%)' }}
       />
 
-      {/* Main Glass Card container */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-[480px]"
-      >
-        <Card className="w-full border-slate-200/80 bg-white/95 p-8 backdrop-blur-xl shadow-2xl flex flex-col gap-6 rounded-2xl">
+      {/* Centered Login Card Section */}
+      <div className="flex-1 w-full flex items-center justify-center py-6 sm:py-8 z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-[480px]"
+        >
+          <Card className="w-full border-slate-200/80 bg-white/95 p-6 sm:p-8 backdrop-blur-xl shadow-2xl flex flex-col gap-6 rounded-2xl">
           
           {/* Header Row */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-5">
@@ -250,10 +251,11 @@ export default function LoginPage() {
           
         </Card>
       </motion.div>
+      </div>
 
       {/* Persistent Legal and Emergency Footer on Login Page */}
-      <div className="w-full mt-auto relative z-10 pt-6">
-        <PublicFooter className="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 max-w-5xl mx-auto shadow-sm" />
+      <div className="w-full relative z-10 pt-4 pb-2 max-w-5xl mx-auto">
+        <PublicFooter className="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-sm" />
       </div>
     </div>
   );
