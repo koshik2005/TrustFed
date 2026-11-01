@@ -283,6 +283,55 @@ def test_validate_encryption_key_startup_check():
         else: os.environ.pop("ALLOW_DEMO_USERS", None)
 
 
+def test_bcrypt_rehashing_on_successful_login():
+    """Verify that legacy PBKDF2 password hashes are automatically upgraded to bcrypt (rounds=12) on successful login."""
+    import hashlib
+    from db.database import SessionLocal
+    from db import models
+
+    pw = "LegacyPBKDF2Password!2026"
+    salt = "a1b2c3d4e5f60718"
+    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 200_000).hex()
+    legacy_hash = f"pbkdf2_sha256$200000${salt}${dk}"
+
+    db = SessionLocal()
+    try:
+        test_user = db.query(models.User).filter_by(email="legacy_user@trustfed.ai").first()
+        if not test_user:
+            test_user = models.User(
+                email="legacy_user@trustfed.ai",
+                name="Legacy Hash User",
+                role="doctor",
+                hospital_id="1",
+                password_hash=legacy_hash,
+                status="active"
+            )
+            db.add(test_user)
+        else:
+            test_user.password_hash = legacy_hash
+            test_user.status = "active"
+            test_user.deleted_at = None
+        db.commit()
+
+        db.refresh(test_user)
+        assert test_user.password_hash.startswith("pbkdf2_sha256$")
+
+        # Login via API
+        login_res = client.post("/api/v1/auth/login", json={"email": "legacy_user@trustfed.ai", "password": pw})
+        assert login_res.status_code == 200, f"Expected 200, got {login_res.status_code}: {login_res.text}"
+
+        # Verify password_hash in DB has been transparently upgraded to bcrypt work factor 12
+        db.refresh(test_user)
+        assert test_user.password_hash.startswith(("$2b$12$", "$2a$12$", "$2y$12$")), (
+            f"Expected bcrypt hash starting with $2b$12$, got: {test_user.password_hash[:15]}"
+        )
+
+        # Subsequent login works with upgraded bcrypt hash
+        login_res_2 = client.post("/api/v1/auth/login", json={"email": "legacy_user@trustfed.ai", "password": pw})
+        assert login_res_2.status_code == 200
+    finally:
+        db.close()
+
 
 if __name__ == "__main__":
     import time

@@ -61,7 +61,7 @@ def test_health_reports_deployment_mode(monkeypatch):
     data = res.json()
     assert "mode" in data
     assert data["mode"] == "informational"
-    assert data["version"] == "2.0.0"
+    assert data["version"] == "2.1.1"
 
     monkeypatch.setenv("APP_MODE", "clinical")
     res_clin = client.get("/health")

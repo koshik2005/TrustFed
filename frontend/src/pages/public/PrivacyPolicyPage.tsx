@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Authentication Credentials:</strong> Passwords hashed with <code>bcrypt</code> (work factor 12). Plaintext passwords are never stored or logged.</li>
           <li><strong>MFA Credentials:</strong> TOTP Base32 secrets stored encrypted; single-use emergency recovery codes hashed using SHA-256.</li>
           <li><strong>Immutable Audit Trail:</strong> High-risk administrative actions (user provisioning, soft deletions, password changes, model checkpoint promotions) record the acting user ID and timestamp in an append-only audit ledger.</li>
-          <li><strong>Ephemeral Network Identifiers:</strong> IP addresses are inspected in-memory by rate limiters (SlowAPI) to prevent denial of service and brute-force attacks, and are never attached to public decision-support queries.</li>
+          <li><strong>Ephemeral & Audit Network Identifiers:</strong> IP addresses are evaluated in-memory by rate limiters (SlowAPI) to prevent denial of service. For failed login security events, the originating IP is recorded in the append-only audit ledger (under <code>node_id</code>) for brute-force defense. Standard cloud platform hosting infrastructure (Cloudflare, Vercel, Render) processes network metadata in server access logs. IP addresses are never attached to public decision-support queries.</li>
           <li><strong>Retention Policy:</strong> Account records remain active while the personnel is affiliated with their hospital node. Soft-deleted accounts enter a 30-day retention grace period before permanent purging.</li>
         </ul>
       </section>
@@ -117,7 +117,7 @@ export default function PrivacyPolicyPage() {
             <tbody className="divide-y divide-slate-200 text-slate-600">
               <tr>
                 <td className="p-2 font-mono font-medium text-slate-800">tf_refresh_token</td>
-                <td className="p-2 font-mono">/api/v1/auth</td>
+                <td className="p-2 font-mono">/api</td>
                 <td className="p-2 font-mono text-[11px]">HttpOnly; Secure; SameSite=Lax</td>
                 <td className="p-2">7 days (604800s)</td>
                 <td className="p-2">Secure token rotation for authenticated staff sessions</td>

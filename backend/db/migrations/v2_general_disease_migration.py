@@ -20,6 +20,13 @@ def migrate_up(engine):
     # 1. Create any missing tables defined in Base metadata
     Base.metadata.create_all(bind=engine)
 
+    # 1b. Ensure soft-delete and MFA columns are created on existing tables first
+    try:
+        from db.migrations.v4_mfa_and_soft_delete import migrate_up as migrate_v4_mfa
+        migrate_v4_mfa(engine)
+    except Exception as e:
+        print(f"[MIGRATION UP] Pre-flight v4 check notice: {e}")
+
     inspector = inspect(engine)
     user_columns = {c["name"] for c in inspector.get_columns("users")}
 
@@ -29,7 +36,7 @@ def migrate_up(engine):
             conn.execute(text("ALTER TABLE users ADD COLUMN hub_id VARCHAR"))
             print("[MIGRATION UP] Added column 'hub_id' to users.")
         if "must_reset_password" not in user_columns:
-            conn.execute(text("ALTER TABLE users ADD COLUMN must_reset_password BOOLEAN DEFAULT 0"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN must_reset_password BOOLEAN DEFAULT FALSE"))
             print("[MIGRATION UP] Added column 'must_reset_password' to users.")
         if "status" not in user_columns:
             conn.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR DEFAULT 'active'"))
@@ -46,26 +53,31 @@ def migrate_up(engine):
             ("hub-west", "West Coast Regional Aggregator", "West"),
         ]
         for hid, hname, hregion in hubs:
-            if not db.query(models.RegionalHub).filter_by(id=hid).first():
-                db.add(models.RegionalHub(id=hid, name=hname, region=hregion, status="active"))
+            res = db.execute(text("SELECT id FROM regional_hubs WHERE id = :id"), {"id": hid}).first()
+            if not res:
+                db.execute(
+                    text("INSERT INTO regional_hubs (id, name, region, status) VALUES (:id, :name, :region, 'active')"),
+                    {"id": hid, "name": hname, "region": hregion}
+                )
         db.commit()
 
-        # Migrate existing hospital_nodes to hospitals table
-        nodes = db.query(models.HospitalNode).all()
-        for node in nodes:
-            existing_hosp = db.query(models.Hospital).filter_by(id=node.id).first()
-            if not existing_hosp:
-                hub_id = "hub-east" if (node.region and "east" in node.region.lower()) else "hub-west"
-                db.add(models.Hospital(
-                    id=node.id,
-                    name=node.name or f"Hospital Node #{node.id}",
-                    hub_id=hub_id,
-                    status=node.status or "active",
-                    share_deidentified=True,
-                    dataset_size=node.dataset_size or 0,
-                    consent_record_fields=json.dumps({"terms": "v2.0", "optIn": True})
-                ))
-        db.commit()
+        # Migrate existing hospital_nodes to hospitals table if legacy table exists
+        if "hospital_nodes" in inspector.get_table_names():
+            nodes = db.query(models.HospitalNode).all()
+            for node in nodes:
+                existing_hosp = db.query(models.Hospital).filter_by(id=node.id).first()
+                if not existing_hosp:
+                    hub_id = "hub-east" if (node.region and "east" in node.region.lower()) else "hub-west"
+                    db.add(models.Hospital(
+                        id=node.id,
+                        name=node.name or f"Hospital Node #{node.id}",
+                        hub_id=hub_id,
+                        status=node.status or "active",
+                        share_deidentified=True,
+                        dataset_size=node.dataset_size or 0,
+                        consent_record_fields=json.dumps({"terms": "v2.0", "optIn": True})
+                    ))
+            db.commit()
 
         # 4. Migrate existing patient_predictions into encounters and patients without data loss
         preds = db.query(models.PatientPrediction).all()

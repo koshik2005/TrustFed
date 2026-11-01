@@ -1,8 +1,11 @@
 import datetime
 import json
+import logging
 import os
 import time
 import uuid
+
+logger = logging.getLogger("trustfed.routes")
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, Cookie
 from pydantic import BaseModel
@@ -330,6 +333,12 @@ def login(request: Request, body: LoginBody, response: Response, db: Session = D
         record_account_failed_attempt(norm_email)
         store.add_audit(db, None, client_ip, "auth", f"Failed login attempt for {norm_email[:60]}")
         raise HTTPException(401, "Invalid email or password")
+
+    # Transparent cryptographic migration: Automatically re-hash legacy PBKDF2 hashes to bcrypt (work factor 12)
+    if u.password_hash and u.password_hash.startswith("pbkdf2_sha256$"):
+        u.password_hash = auth.hash_password(body.password)
+        db.commit()
+        logger.info("[AUTH] Upgraded legacy PBKDF2 password hash to bcrypt (work factor 12) for %s", u.email)
 
     if u.deleted_at is not None or (u.status and u.status != "active"):
         store.add_audit(db, None, u.email, "auth", f"Login rejected: user account is {u.status or 'deleted'}")

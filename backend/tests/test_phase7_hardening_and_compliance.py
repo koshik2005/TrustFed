@@ -127,7 +127,7 @@ def test_health_endpoints_database_ping_and_version():
         data = res.json()
         assert data["status"] == "healthy"
         assert data["database"] == "connected"
-        assert data["version"] == "2.0.0"
+        assert data["version"] == "2.1.1"
 
 
 # ── 3. Data Deletion Controls (Right to Erasure / DPDP Act 2023) ──────────────

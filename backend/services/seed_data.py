@@ -56,6 +56,72 @@ DISEASES = [
         "category": "Cardiovascular",
         "common_symptoms": ["exertional_angina", "substernal_chest_pressure", "shortness_of_breath", "diaphoresis"]
     },
+    {
+        "code": "MALARIA",
+        "name": "Malaria",
+        "category": "Infectious / Parasitic",
+        "common_symptoms": ["high_fever", "rigors_chills", "profuse_sweating", "headache", "splenomegaly"]
+    },
+    {
+        "code": "COVID19",
+        "name": "COVID-19 / Acute Respiratory Illness",
+        "category": "Respiratory / Viral",
+        "common_symptoms": ["loss_of_taste_smell", "dry_cough", "breathlessness", "fever", "fatigue"]
+    },
+    {
+        "code": "GASTROENTERITIS",
+        "name": "Acute Gastroenteritis",
+        "category": "Gastrointestinal",
+        "common_symptoms": ["vomiting", "watery_diarrhea", "abdominal_cramps", "dehydration", "nausea"]
+    },
+    {
+        "code": "PNEUMONIA",
+        "name": "Community-Acquired Pneumonia",
+        "category": "Lower Respiratory",
+        "common_symptoms": ["productive_cough", "pleuritic_chest_pain", "high_fever", "hypoxemia", "tachypnea"]
+    },
+    {
+        "code": "BRONCHITIS",
+        "name": "Acute Bronchitis",
+        "category": "Lower Respiratory",
+        "common_symptoms": ["persistent_cough", "sputum_production", "wheezing", "sore_throat", "chest_tightness"]
+    },
+    {
+        "code": "ASTHMA",
+        "name": "Bronchial Asthma Exacerbation",
+        "category": "Respiratory / Allergic",
+        "common_symptoms": ["expiratory_wheezing", "dyspnea", "chest_tightness", "cough_nocturnal"]
+    },
+    {
+        "code": "HYPERTENSION",
+        "name": "Essential Hypertension",
+        "category": "Cardiovascular",
+        "common_symptoms": ["occipital_headache", "dizziness", "elevated_bp_systolic", "blurred_vision"]
+    },
+    {
+        "code": "TYPE2_DIABETES",
+        "name": "Type 2 Diabetes Mellitus",
+        "category": "Endocrine / Metabolic",
+        "common_symptoms": ["polydipsia", "polyuria", "chronic_fatigue", "hyperglycemia", "weight_loss"]
+    },
+    {
+        "code": "ANEMIA",
+        "name": "Iron Deficiency / Nutritional Anemia",
+        "category": "Hematological",
+        "common_symptoms": ["pallor", "fatigue", "dizziness", "exertional_dyspnea", "brittle_nails"]
+    },
+    {
+        "code": "MIGRAINE",
+        "name": "Migraine / Vascular Cephalea",
+        "category": "Neurological",
+        "common_symptoms": ["unilateral_throbbing_headache", "photophobia", "phonophobia", "nausea_vomiting"]
+    },
+    {
+        "code": "ALLERGIC_RHINITIS",
+        "name": "Allergic Rhinitis (Hay Fever)",
+        "category": "Allergic / Immunological",
+        "common_symptoms": ["paroxysmal_sneezing", "nasal_pruritus", "rhinorrhea", "watery_eyes"]
+    },
 ]
 
 DEMO_HUBS = [

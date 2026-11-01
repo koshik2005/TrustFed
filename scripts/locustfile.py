@@ -2,47 +2,74 @@
 
 Simulates 50 concurrent clinical & public users querying:
 - /ready & /health
-- /prediction/predict (Heart risk prediction with SHAP)
-- /clinical/predict (18-disease calibrated differential diagnosis)
-- /prediction/metrics
+- /api/v1/clinical/symptoms
+- /api/v1/prediction/predict (Heart risk prediction with SHAP)
+- /api/v1/clinical/predict (18-disease calibrated differential diagnosis)
+- /metrics
 """
 import os
 import sys
-from locust import HttpUser, task, between, events
+import threading
+import requests
+from locust import HttpUser, task, between
 
-# Ensure backend modules can be imported to generate signed tokens
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
-os.environ["SECRET_KEY"] = os.getenv("SECRET_KEY", "load-test-secret-key-32-chars-long-2026")
-from services import auth
+# Shared token cache so virtual users do not hammer /login
+_TOKEN_LOCK = threading.Lock()
+_CACHED_TOKEN = None
 
 
 class TrustFedUser(HttpUser):
-    wait_time = between(0.1, 0.5)
+    wait_time = between(0.2, 0.8)
 
     def on_start(self):
-        """Generate authenticated session token for doctor / clinical role."""
-        token = auth.create_token({
-            "sub": "doctor@trustfed.ai",
-            "role": "doctor",
-            "hospital_id": "1",
-            "user_id": 2
-        }, ttl=7200)
+        global _CACHED_TOKEN
+        # Each simulated client user gets an isolated simulated IP to prevent artificial rate-limit collapse
+        self.user_ip = f"198.51.100.{(id(self) % 250) + 1}"
+
+        with _TOKEN_LOCK:
+            if not _CACHED_TOKEN:
+                login_url = f"{self.host.rstrip('/')}/api/v1/auth/login"
+                try:
+                    resp = requests.post(
+                        login_url,
+                        json={"email": "admin@trustfed.ai", "password": "TrustFed2026!SecAdmin"},
+                        headers={"Content-Type": "application/json"},
+                        timeout=15
+                    )
+                    if resp.status_code == 200:
+                        _CACHED_TOKEN = resp.json().get("token")
+                except Exception as e:
+                    print(f"[WARN] Remote login failed: {e}")
+
+                if not _CACHED_TOKEN:
+                    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
+                    from services import auth
+                    _CACHED_TOKEN = auth.create_token({
+                        "sub": "admin@trustfed.ai",
+                        "role": "global_admin",
+                        "hospital_id": "1",
+                        "user_id": 1
+                    }, ttl=7200)
+
+        internal_tok = os.getenv("INTERNAL_METRICS_TOKEN", "")
         self.headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {_CACHED_TOKEN}",
+            "Content-Type": "application/json",
+            "X-Internal-Token": internal_tok,
+            "X-Forwarded-For": self.user_ip
         }
 
     @task(3)
     def test_ready_endpoint(self):
-        self.client.get("/ready", name="/ready")
+        self.client.get("/ready", headers=self.headers, name="/ready")
 
     @task(3)
     def test_health_endpoint(self):
-        self.client.get("/health", name="/health")
+        self.client.get("/health", headers=self.headers, name="/health")
 
     @task(3)
     def test_clinical_symptoms(self):
-        self.client.get("/api/v1/clinical/symptoms", name="/api/v1/clinical/symptoms")
+        self.client.get("/api/v1/clinical/symptoms", headers=self.headers, name="/api/v1/clinical/symptoms")
 
     @task(5)
     def test_cardiac_prediction(self):

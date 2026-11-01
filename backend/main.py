@@ -32,15 +32,17 @@ limiter = Limiter(key_func=get_client_ip, default_limits=[rate_limit_default], e
 async def lifespan(app: FastAPI):
     from core.deployment_mode import validate_deployment_mode_on_startup
     validate_deployment_mode_on_startup()
+    from core.metrics_auth import validate_internal_metrics_token_on_startup
+    validate_internal_metrics_token_on_startup()
     auth.validate_secret_key_on_startup()
     from services import crypto
     crypto.validate_encryption_key_on_startup()
+    from db.migrations.v4_mfa_and_soft_delete import migrate_up as migrate_v4_mfa
+    migrate_v4_mfa(engine)
     from db.migrations.v2_general_disease_migration import migrate_up
     migrate_up(engine)
     from db.migrations.v3_performance_indexes import migrate_up as migrate_v3_indexes
     migrate_v3_indexes(engine)
-    from db.migrations.v4_mfa_and_soft_delete import migrate_up as migrate_v4_mfa
-    migrate_v4_mfa(engine)
     from db.migrations.enable_rls import enable_row_level_security
     enable_row_level_security(engine)
 
@@ -220,9 +222,11 @@ def readiness_check(response: Response, db: Session = Depends(get_db)):
             "mode": get_app_mode()
         }
 
+    from db.database import engine
     return {
         "status": "ready",
         "database": "connected",
+        "database_engine": engine.dialect.name,
         "model": "loaded",
         "version": "2.1.1",
         "mode": get_app_mode()

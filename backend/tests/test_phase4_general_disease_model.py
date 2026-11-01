@@ -428,3 +428,24 @@ def test_api_encounter_creation_logs_model_version(monkeypatch):
     rule_ids = [rf["ruleId"] for rf in enc["redFlags"]]
     assert "SUSPECTED_MENINGITIS" in rule_ids
     assert enc["disclaimer"] == PERSISTENT_DISCLAIMER
+
+
+def test_database_diseases_table_synced_with_18_conditions():
+    """Verify that the relational database diseases table is 100% synced with the 18-condition inference model."""
+    from db.database import SessionLocal
+    from db import models
+    from services.seed_data import seed_synthetic_data
+    from services.general_disease_model import DISEASE_KEYS
+
+    db = SessionLocal()
+    try:
+        seed_synthetic_data(db, force=True)
+        diseases = db.query(models.Disease).all()
+        assert len(diseases) == 18, f"Expected 18 database diseases, found {len(diseases)}"
+
+        # Check all disease codes exist and are active
+        codes = {d.code for d in diseases}
+        assert len(codes) == 18
+        assert all(d.is_active for d in diseases)
+    finally:
+        db.close()

@@ -241,6 +241,13 @@ When `GET /api/v1/model/monitoring` returns `drift_status.has_alerts = true`:
 
 ## 9. CI/CD Deployment Gate & Deploy Hooks Configuration
 
+> [!WARNING]
+> **CRITICAL PRE-REQUISITE**:
+> **Auto-deploy must NOT be disabled in Render or Vercel dashboards until CI is confirmed green on GitHub and deploy hooks have been tested once.**
+> If auto-deploy is disabled before GitHub Actions CI is active and passing with valid webhook secrets, subsequent commits will be blocked from deploying to production.
+> 
+> *Current GitHub Status*: As verified via OAuth Git push rejection, `.github/workflows/ci.yml` does **NOT** currently exist on GitHub `origin/main` because token permissions lack the `workflow` scope. CI is marked `NOT ACTIVE` until the repository administrator creates `.github/workflows/ci.yml` via the GitHub Web UI and verifies a green run.
+
 By default, git pushes to `main` trigger immediate builds on Render and Vercel regardless of CI results. To enforce the production gate (deployment **only** occurs after GitHub Actions checks pass):
 
 ### 1. Render Dashboard Setup (Backend Auto-Deploy Disablement)

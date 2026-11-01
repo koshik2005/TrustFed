@@ -54,7 +54,7 @@ def test_ready_endpoint_healthy():
     assert data["status"] == "ready"
     assert data["database"] == "connected"
     assert data["model"] == "loaded"
-    assert data["version"] == "2.0.0"
+    assert data["version"] == "2.1.1"
 
 
 def test_ready_endpoint_db_failure():
@@ -108,14 +108,23 @@ def test_latency_tracker_percentiles():
 
 
 def test_metrics_endpoint():
-    """Verify /metrics and /api/prediction/metrics require authentication or internal token."""
+    """Verify /metrics and /api/prediction/metrics require global_admin or internal token."""
+    from core.metrics_auth import get_internal_metrics_token
+
+    valid_token = get_internal_metrics_token()
+
     # 1. Unauthenticated request rejected with 401
     unauth = client.get("/metrics")
     assert unauth.status_code == 401, f"Expected 401, got {unauth.status_code}"
     assert "Authentication required" in unauth.json()["detail"]
 
-    # 2. Access with internal token succeeds
-    res_internal = client.get("/metrics", headers={"X-Internal-Token": "trustfed-internal-metrics-secret"})
+    # 2. Rotated/deprecated committed token is rejected with 401
+    deprecated_res = client.get("/metrics", headers={"X-Internal-Token": "trustfed-internal-metrics-secret"})
+    assert deprecated_res.status_code == 401
+    assert "Invalid internal metrics token" in deprecated_res.json()["detail"]
+
+    # 3. Access with valid internal token succeeds
+    res_internal = client.get("/metrics", headers={"X-Internal-Token": valid_token})
     assert res_internal.status_code == 200
     data = res_internal.json()
     assert data["status"] == "ok"
@@ -124,16 +133,50 @@ def test_metrics_endpoint():
     assert "p95_ms" in data["prediction_latency"]
     assert "p99_ms" in data["prediction_latency"]
 
-    # 3. Access with valid user Bearer token succeeds
-    auth_tok = auth.create_token({"sub": "doc@trustfed.ai", "role": "doctor", "user_id": 1})
-    res_bearer = client.get("/metrics", headers={"Authorization": f"Bearer {auth_tok}"})
-    assert res_bearer.status_code == 200
+    # 4. Non-global_admin user (e.g. doctor) is forbidden (403)
+    doc_tok = auth.create_token({"sub": "doc@trustfed.ai", "role": "doctor", "user_id": 1})
+    res_doctor = client.get("/metrics", headers={"Authorization": f"Bearer {doc_tok}"})
+    assert res_doctor.status_code == 403
+    assert "global_admin" in res_doctor.json()["detail"]
 
-    # 4. /api/v1/prediction/metrics route is equally protected
+    # 5. Global admin user succeeds (200)
+    admin_tok = auth.create_token({"sub": "admin@trustfed.ai", "role": "global_admin", "user_id": 99})
+    res_admin = client.get("/metrics", headers={"Authorization": f"Bearer {admin_tok}"})
+    assert res_admin.status_code == 200
+
+    # 6. /api/v1/prediction/metrics route is equally restricted
     res_pred_unauth = client.get("/api/v1/prediction/metrics")
     assert res_pred_unauth.status_code == 401
-    res_pred_tok = client.get("/api/v1/prediction/metrics", headers={"X-Internal-Token": "trustfed-internal-metrics-secret"})
+    res_pred_doc = client.get("/api/v1/prediction/metrics", headers={"Authorization": f"Bearer {doc_tok}"})
+    assert res_pred_doc.status_code == 403
+    res_pred_tok = client.get("/api/v1/prediction/metrics", headers={"X-Internal-Token": valid_token})
     assert res_pred_tok.status_code == 200
+
+
+def test_internal_metrics_token_production_startup_validation():
+    """Verify backend startup refuses to run in production if INTERNAL_METRICS_TOKEN is missing or insecure."""
+    from core.metrics_auth import validate_internal_metrics_token_on_startup
+    import pytest
+
+    # 1. Missing in production -> Refuse
+    with patch.dict(os.environ, {"ENVIRONMENT": "production", "INTERNAL_METRICS_TOKEN": ""}):
+        with pytest.raises(RuntimeError, match="INTERNAL_METRICS_TOKEN environment variable is required in production"):
+            validate_internal_metrics_token_on_startup()
+
+    # 2. Deprecated committed default in production -> Refuse
+    with patch.dict(os.environ, {"ENVIRONMENT": "production", "INTERNAL_METRICS_TOKEN": "trustfed-internal-metrics-secret"}):
+        with pytest.raises(RuntimeError, match="insecure, too short.*or matches a deprecated token"):
+            validate_internal_metrics_token_on_startup()
+
+    # 3. Too short token in production -> Refuse
+    with patch.dict(os.environ, {"ENVIRONMENT": "production", "INTERNAL_METRICS_TOKEN": "short-secret-123"}):
+        with pytest.raises(RuntimeError, match="insecure, too short"):
+            validate_internal_metrics_token_on_startup()
+
+    # 4. Valid high-entropy token in production -> Passes cleanly
+    valid_prod_token = "K9x_v2N7qL4wP8jZ1bC5aA3fG0dE6hI8"
+    with patch.dict(os.environ, {"ENVIRONMENT": "production", "INTERNAL_METRICS_TOKEN": valid_prod_token}):
+        validate_internal_metrics_token_on_startup()  # Should not raise
 
 
 def test_model_cache_avoids_repeated_disk_io():

@@ -1,3 +1,11 @@
+# Test & Load Test Artifacts
+*.csv
+locust_report*
+locust_live*
+.playwright/
+playwright-report/
+frontend/playwright-report/
+
 # Environment & Secrets
 .env
 *.env

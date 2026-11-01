@@ -49,8 +49,8 @@ For authorized personnel utilizing the TrustFed administrative and clinical work
 - **Staff Credentials & Roles**: Work email address (e.g. `doctor@hospital.org`), full name, assigned role (`hospital_staff`, `doctor`, `regional_admin`, `global_admin`), assigned hospital/hub tenant IDs, and password hashes generated using bcrypt (cost factor $\ge 12$). Plaintext passwords are never stored or logged.
 - **MFA Secrets**: Base32 TOTP secret keys encrypted at rest using MultiFernet symmetric encryption (`PATIENT_ENCRYPTION_KEY`), and SHA-256 hashes of 8 single-use emergency backup recovery codes.
 - **Audit Logs**: Cryptographically hash-chained immutable audit records logging authentication events, MFA enrollment/resets, password changes, tenant configuration updates, and model lifecycle events. Each entry records the acting user email, event type, description, and ISO-8601 UTC timestamp.
-- **Network Identifiers & IP Addresses**: IP addresses are evaluated ephemerally in volatile memory via reverse proxy headers (`X-Forwarded-For`, `X-Real-IP`) strictly for rate limiting (120 req/min default) and automated brute-force defense. IP addresses are NOT stored in persistent user profiles or linked to usage metrics.
-- **Account Data Retention**: Active account records are maintained until administrative deactivation or soft deletion. Soft-deleted accounts are permanently purged after a 90-day retention window. Audit ledger records are retained for a minimum 1-year operational verification period.
+- **Network Identifiers & IP Addresses**: IP addresses are evaluated ephemerally in volatile memory via reverse proxy headers (`X-Forwarded-For`, `CF-Connecting-IP`, `X-Real-IP`) strictly for rate limiting (120 req/min default) and automated brute-force defense. For failed authentication security events, the originating client IP is recorded in the immutable security audit ledger (`AuditLog.node_id`) for forensic intrusion analysis and account lockout defense. Standard cloud platform hosting infrastructure (Cloudflare, Vercel edge routers, Render application containers) processes standard network transit metadata in web server access logs. IP addresses are NEVER linked to anonymous public differential inferences or patient decision support.
+- **Account Data Retention**: Active account records are maintained until administrative deactivation or soft deletion. Soft-deleted accounts enter a 30-day retention grace period before permanent purging. Audit ledger records are retained for a minimum 1-year operational verification period.
 
 ---
 
@@ -59,12 +59,12 @@ For authorized personnel utilizing the TrustFed administrative and clinical work
 > [!NOTE]
 > **No Non-Essential, Advertising, or Tracking Cookies Used.**  
 > TrustFed uses **ONLY strictly essential** cookies required for secure user session management:
-> - **`tf_refresh_token`**: A cryptographic session token with attributes:
+> - **`tf_refresh_token`**: A cryptographic session token verified on the deployed environment with exact attributes:
 >   - `HttpOnly`: Inaccessible to client-side scripts, protecting against cross-site scripting (XSS).
 >   - `Secure`: Transmitted strictly over TLS/HTTPS connections.
->   - `SameSite`: Configured as `SameSite=None` for decoupled cross-origin API architecture (`*.onrender.com` $\to$ `*.vercel.app`) or `SameSite=Lax` / `Strict` on reverse proxy configurations.
->   - `Path`: Scoped specifically to `/api/auth` to minimize unnecessary ambient cookie transmission.
->   - `Max-Age`: 604,800 seconds (7 days expiration).
+>   - `SameSite`: Configured as `SameSite=Lax` (preventing CSRF while allowing top-level navigation).
+>   - `Path`: Scoped to `/api` (`Path=/api;`) to cover all API endpoints across reverse proxies.
+>   - `Max-Age`: `604800` seconds (7 days expiration).
 > - **CSRF Token (`X-CSRF-Token`)**: Passed via custom HTTP request headers to prevent cross-site request forgery attacks.
 > 
 > TrustFed uses **ZERO advertising, tracking, marketing, or third-party analytics cookies**. Because no non-essential cookies are placed on user devices, no cookie consent banner is legally required under standard electronic privacy regulations.
