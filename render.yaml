@@ -32,6 +32,8 @@ services:
         sync: false            # MultiFernet key list: 'key2,key1'
       - key: SUPABASE_DB_URL
         sync: false            # Managed PostgreSQL connection string (IPv4 pooler)
+      - key: INTERNAL_METRICS_TOKEN
+        generateValue: true    # Cryptographically random token for scraping /metrics
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL
